@@ -1,0 +1,388 @@
+"""CRUD de catálogos: empleados, labores, semanas, líderes, productos, tipos."""
+
+import csv
+import io
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from sqlalchemy.orm import Session
+from typing import Optional, List
+from database import get_db
+from models import (
+    Empleado, Lider, ProductoArea, Semana, LaborRendimiento, TipoBonificacion, Usuario
+)
+from schemas import (
+    EmpleadoCreate, EmpleadoUpdate, EmpleadoOut,
+    LiderCreate, LiderOut,
+    ProductoAreaCreate, ProductoAreaOut,
+    SemanaCreate, SemanaUpdate, SemanaOut,
+    LaborRendimientoCreate, LaborRendimientoUpdate, LaborRendimientoOut,
+    TipoBonificacionCreate, TipoBonificacionOut,
+)
+from services.auth import get_current_user, get_sede_activa, requiere_permiso
+
+router = APIRouter()
+
+
+# ─── Empleados ─────────────────────────────────────────────
+@router.get("/empleados", response_model=List[EmpleadoOut])
+def listar_empleados(
+    buscar: Optional[str] = None,
+    activo: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(Empleado).filter(Empleado.sede_id == sede_id)
+    if activo is not None:
+        q = q.filter(Empleado.activo == activo)
+    if buscar:
+        q = q.filter(
+            (Empleado.nombre.ilike(f"%{buscar}%")) |
+            (Empleado.codigo == int(buscar) if buscar.isdigit() else False)
+        )
+    return q.order_by(Empleado.nombre).all()
+
+
+@router.post("/empleados", response_model=EmpleadoOut)
+def crear_empleado(
+    data: EmpleadoCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(Empleado).filter_by(sede_id=sede_id, codigo=data.codigo).first():
+        raise HTTPException(400, f"Ya existe un empleado con código {data.codigo}")
+    emp = Empleado(**data.model_dump(), sede_id=sede_id)
+    db.add(emp)
+    db.commit()
+    db.refresh(emp)
+    return emp
+
+
+@router.put("/empleados/{id}", response_model=EmpleadoOut)
+def actualizar_empleado(
+    id: int, data: EmpleadoUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    emp = db.query(Empleado).filter_by(id=id, sede_id=sede_id).first()
+    if not emp:
+        raise HTTPException(404, "Empleado no encontrado")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(emp, k, v)
+    db.commit()
+    db.refresh(emp)
+    return emp
+
+
+@router.delete("/empleados/{id}")
+def desactivar_empleado(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    emp = db.query(Empleado).filter_by(id=id, sede_id=sede_id).first()
+    if not emp:
+        raise HTTPException(404, "Empleado no encontrado")
+    emp.activo = False
+    db.commit()
+    return {"mensaje": f"Empleado {emp.nombre} desactivado"}
+
+
+@router.post("/empleados/importar-csv")
+async def importar_empleados_csv(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    contenido = (await archivo.read()).decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(contenido))
+    creados = 0
+    actualizados = 0
+    errores = []
+
+    for i, row in enumerate(reader, start=2):
+        try:
+            codigo = int(row.get("codigo", "").strip())
+            nombre = row.get("nombre", "").strip()
+            cargo = row.get("cargo", "").strip() or "OPERARIO"
+
+            existente = db.query(Empleado).filter_by(sede_id=sede_id, codigo=codigo).first()
+            if existente:
+                existente.nombre = nombre
+                existente.cargo = cargo
+                existente.activo = True
+                actualizados += 1
+            else:
+                db.add(Empleado(sede_id=sede_id, codigo=codigo, nombre=nombre, cargo=cargo))
+                creados += 1
+        except Exception as e:
+            errores.append(f"Fila {i}: {str(e)}")
+
+    db.commit()
+    return {"creados": creados, "actualizados": actualizados, "errores": errores}
+
+
+# ─── Labores de Rendimiento ───────────────────────────────
+@router.get("/labores-rendimiento", response_model=List[LaborRendimientoOut])
+def listar_labores(
+    activo: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(LaborRendimiento).filter(LaborRendimiento.sede_id == sede_id)
+    if activo is not None:
+        q = q.filter(LaborRendimiento.activo == activo)
+    return q.order_by(LaborRendimiento.nombre).all()
+
+
+@router.post("/labores-rendimiento", response_model=LaborRendimientoOut)
+def crear_labor(
+    data: LaborRendimientoCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(LaborRendimiento).filter_by(sede_id=sede_id, nombre=data.nombre).first():
+        raise HTTPException(400, f"Ya existe la labor '{data.nombre}'")
+    labor = LaborRendimiento(**data.model_dump(), sede_id=sede_id)
+    labor.recalcular_valores()
+    db.add(labor)
+    db.commit()
+    db.refresh(labor)
+    return labor
+
+
+@router.put("/labores-rendimiento/{id}", response_model=LaborRendimientoOut)
+def actualizar_labor(
+    id: int, data: LaborRendimientoUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    labor = db.query(LaborRendimiento).filter_by(id=id, sede_id=sede_id).first()
+    if not labor:
+        raise HTTPException(404, "Labor no encontrada")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(labor, k, v)
+    labor.recalcular_valores()
+    db.commit()
+    db.refresh(labor)
+    return labor
+
+
+@router.delete("/labores-rendimiento/{id}")
+def desactivar_labor(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    labor = db.query(LaborRendimiento).filter_by(id=id, sede_id=sede_id).first()
+    if not labor:
+        raise HTTPException(404, "Labor no encontrada")
+    labor.activo = False
+    db.commit()
+    return {"mensaje": f"Labor '{labor.nombre}' desactivada"}
+
+
+# ─── Semanas ───────────────────────────────────────────────
+@router.get("/semanas", response_model=List[SemanaOut])
+def listar_semanas(
+    año: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(Semana).filter(Semana.sede_id == sede_id)
+    if año:
+        q = q.filter(Semana.año == año)
+    return q.order_by(Semana.codigo).all()
+
+
+@router.post("/semanas", response_model=SemanaOut)
+def crear_semana(
+    data: SemanaCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(Semana).filter_by(sede_id=sede_id, codigo=data.codigo).first():
+        raise HTTPException(400, f"Semana '{data.codigo}' ya existe")
+    semana = Semana(**data.model_dump(), sede_id=sede_id)
+    db.add(semana)
+    db.commit()
+    db.refresh(semana)
+    return semana
+
+
+@router.put("/semanas/{id}", response_model=SemanaOut)
+def actualizar_semana(
+    id: int, data: SemanaUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    semana = db.query(Semana).filter_by(id=id, sede_id=sede_id).first()
+    if not semana:
+        raise HTTPException(404, "Semana no encontrada")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(semana, k, v)
+    db.commit()
+    db.refresh(semana)
+    return semana
+
+
+# ─── Líderes ──────────────────────────────────────────────
+@router.get("/lideres", response_model=List[LiderOut])
+def listar_lideres(
+    activo: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(Lider).filter(Lider.sede_id == sede_id)
+    if activo is not None:
+        q = q.filter(Lider.activo == activo)
+    return q.order_by(Lider.nombre).all()
+
+
+@router.post("/lideres", response_model=LiderOut)
+def crear_lider(
+    data: LiderCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(Lider).filter_by(sede_id=sede_id, nombre=data.nombre).first():
+        raise HTTPException(400, f"Líder '{data.nombre}' ya existe")
+    lider = Lider(**data.model_dump(), sede_id=sede_id)
+    db.add(lider)
+    db.commit()
+    db.refresh(lider)
+    return lider
+
+
+@router.put("/lideres/{id}", response_model=LiderOut)
+def actualizar_lider(
+    id: int, data: LiderCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    lider = db.query(Lider).filter_by(id=id, sede_id=sede_id).first()
+    if not lider:
+        raise HTTPException(404, "Líder no encontrado")
+    lider.nombre = data.nombre
+    lider.activo = data.activo
+    db.commit()
+    db.refresh(lider)
+    return lider
+
+
+@router.delete("/lideres/{id}")
+def desactivar_lider(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    lider = db.query(Lider).filter_by(id=id, sede_id=sede_id).first()
+    if not lider:
+        raise HTTPException(404, "Líder no encontrado")
+    lider.activo = False
+    db.commit()
+    return {"mensaje": f"Líder '{lider.nombre}' desactivado"}
+
+
+# ─── Productos / Áreas ────────────────────────────────────
+@router.get("/productos-areas", response_model=List[ProductoAreaOut])
+def listar_productos(
+    activo: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(ProductoArea).filter(ProductoArea.sede_id == sede_id)
+    if activo is not None:
+        q = q.filter(ProductoArea.activo == activo)
+    return q.order_by(ProductoArea.nombre).all()
+
+
+@router.post("/productos-areas", response_model=ProductoAreaOut)
+def crear_producto(
+    data: ProductoAreaCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(ProductoArea).filter_by(sede_id=sede_id, nombre=data.nombre).first():
+        raise HTTPException(400, f"Producto/Área '{data.nombre}' ya existe")
+    prod = ProductoArea(**data.model_dump(), sede_id=sede_id)
+    db.add(prod)
+    db.commit()
+    db.refresh(prod)
+    return prod
+
+
+@router.delete("/productos-areas/{id}")
+def desactivar_producto(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    prod = db.query(ProductoArea).filter_by(id=id, sede_id=sede_id).first()
+    if not prod:
+        raise HTTPException(404, "Producto/Área no encontrado")
+    prod.activo = False
+    db.commit()
+    return {"mensaje": f"'{prod.nombre}' desactivado"}
+
+
+# ─── Tipos de Bonificación ────────────────────────────────
+@router.get("/tipos-bonificacion", response_model=List[TipoBonificacionOut])
+def listar_tipos(
+    activo: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(TipoBonificacion).filter(TipoBonificacion.sede_id == sede_id)
+    if activo is not None:
+        q = q.filter(TipoBonificacion.activo == activo)
+    return q.order_by(TipoBonificacion.nombre).all()
+
+
+@router.post("/tipos-bonificacion", response_model=TipoBonificacionOut)
+def crear_tipo(
+    data: TipoBonificacionCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    if db.query(TipoBonificacion).filter_by(sede_id=sede_id, nombre=data.nombre).first():
+        raise HTTPException(400, f"Tipo '{data.nombre}' ya existe")
+    tipo = TipoBonificacion(**data.model_dump(), sede_id=sede_id)
+    db.add(tipo)
+    db.commit()
+    db.refresh(tipo)
+    return tipo
+
+
+@router.delete("/tipos-bonificacion/{id}")
+def desactivar_tipo(
+    id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    tipo = db.query(TipoBonificacion).filter_by(id=id, sede_id=sede_id).first()
+    if not tipo:
+        raise HTTPException(404, "Tipo no encontrado")
+    tipo.activo = False
+    db.commit()
+    return {"mensaje": f"Tipo '{tipo.nombre}' desactivado"}

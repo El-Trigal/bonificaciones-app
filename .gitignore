@@ -1,0 +1,35 @@
+# Base de datos (cada instalación crea la suya)
+data/bonificaciones.db
+data/bonificaciones.db-shm
+data/bonificaciones.db-wal
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# Node (solo para desarrollo)
+frontend/node_modules/
+# frontend/dist/ NO se ignora — va incluido en el repo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archivos de datos de prueba / internos
+*.xlsx
+*.xls
+calidad/
+prompt_claude_code_bonificaciones.md
+explicaciones_no_leer/
