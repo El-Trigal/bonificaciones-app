@@ -1,7 +1,7 @@
 """Endpoints de autenticación y gestión de usuarios."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -51,6 +51,8 @@ class UsuarioOut(BaseModel):
     sede_activa_id: Optional[int] = None
     activo: bool
     ultimo_login: Optional[datetime] = None
+    intentos_fallidos: int = 0
+    bloqueado_hasta: Optional[datetime] = None
     permisos: list[str] = []
 
     class Config:
@@ -116,16 +118,42 @@ def _to_out(u: Usuario, db: Session = None) -> UsuarioOut:
         sede_activa_id=sede_activa_id,
         activo=u.activo,
         ultimo_login=u.ultimo_login,
+        intentos_fallidos=u.intentos_fallidos or 0,
+        bloqueado_hasta=u.bloqueado_hasta,
         permisos=sorted(PERMISOS.get(u.rol, set())),
     )
+
+
+MAX_INTENTOS = 5
+BLOQUEO_MINUTOS = 15
 
 
 @router.post("/login", response_model=UsuarioOut)
 @limiter.limit("10/minute")
 def login(request: Request, data: LoginIn, response: Response, db: Session = Depends(get_db)):
     user = db.query(Usuario).filter_by(username=data.username, activo=True).first()
-    if not user or not verify_password(data.password, user.password_hash):
+
+    # Usuario no existe — respuesta genérica para no revelar cuáles usuarios existen
+    if not user:
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+    # Verificar bloqueo temporal
+    if user.bloqueado_hasta and user.bloqueado_hasta > datetime.utcnow():
+        minutos = int((user.bloqueado_hasta - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(status_code=429, detail=f"Cuenta bloqueada. Intenta en {minutos} min.")
+
+    if not verify_password(data.password, user.password_hash):
+        user.intentos_fallidos = (user.intentos_fallidos or 0) + 1
+        if user.intentos_fallidos >= MAX_INTENTOS:
+            user.bloqueado_hasta = datetime.utcnow() + timedelta(minutes=BLOQUEO_MINUTOS)
+            db.commit()
+            raise HTTPException(status_code=429, detail=f"Demasiados intentos. Cuenta bloqueada por {BLOQUEO_MINUTOS} min.")
+        db.commit()
+        raise HTTPException(status_code=401, detail=f"Usuario o contraseña incorrectos. Intentos: {user.intentos_fallidos}/{MAX_INTENTOS}")
+
+    # Login exitoso — resetear contadores
+    user.intentos_fallidos = 0
+    user.bloqueado_hasta = None
     user.ultimo_login = datetime.utcnow()
     db.commit()
     token = crear_token(user)
@@ -252,6 +280,24 @@ def actualizar_usuario(
         u.activo = data.activo
     if data.password:
         u.password_hash = hash_password(data.password)
+    db.commit()
+    db.refresh(u)
+    return _to_out(u, db)
+
+
+@router.post("/usuarios/{user_id}/desbloquear", response_model=UsuarioOut)
+def desbloquear_usuario(
+    user_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("gestionar_usuarios")),
+):
+    u = db.query(Usuario).get(user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.rol == "ADMIN" and u.sede_id != get_sede_activa(user):
+        raise HTTPException(status_code=403, detail="Sin acceso a este usuario")
+    u.intentos_fallidos = 0
+    u.bloqueado_hasta = None
     db.commit()
     db.refresh(u)
     return _to_out(u, db)

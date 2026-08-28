@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UserPlus, Edit2, CheckCircle2, XCircle } from 'lucide-react';
+import { UserPlus, Edit2, CheckCircle2, XCircle, ShieldAlert, ShieldCheck, Unlock } from 'lucide-react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import useAuthStore from '../store/authStore';
@@ -84,6 +84,22 @@ export default function Usuarios() {
     }
   }
 
+  async function desbloquear(u) {
+    try {
+      await api.post(`/auth/usuarios/${u.id}/desbloquear`);
+      await cargar();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al desbloquear');
+    }
+  }
+
+  function estadoSeguridad(u) {
+    const bloqueado = u.bloqueado_hasta && new Date(u.bloqueado_hasta) > new Date();
+    if (bloqueado) return 'bloqueado';
+    if (u.intentos_fallidos > 0) return 'advertencia';
+    return 'ok';
+  }
+
   const rolesDisponibles = esSuperAdmin ? ROLES_SUPER : ROLES_ADMIN;
   const necesitaSede = form.rol && form.rol !== 'SUPER_ADMIN';
 
@@ -111,15 +127,16 @@ export default function Usuarios() {
               <th className="px-4 py-3 text-left">Rol</th>
               {esSuperAdmin && <th className="px-4 py-3 text-left">Sede</th>}
               <th className="px-4 py-3 text-left">Estado</th>
+              <th className="px-4 py-3 text-left">Seguridad</th>
               <th className="px-4 py-3 text-left">Último login</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {loading ? (
-              <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">Cargando...</td></tr>
+              <tr><td colSpan="8" className="px-4 py-8 text-center text-gray-500">Cargando...</td></tr>
             ) : usuarios.length === 0 ? (
-              <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">Sin usuarios</td></tr>
+              <tr><td colSpan="8" className="px-4 py-8 text-center text-gray-500">Sin usuarios</td></tr>
             ) : usuarios.map((u) => (
               <tr key={u.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono">{u.username}</td>
@@ -135,13 +152,39 @@ export default function Usuarios() {
                     ? <span className="inline-flex items-center gap-1 text-green-700"><CheckCircle2 size={14}/> Activo</span>
                     : <span className="inline-flex items-center gap-1 text-gray-400"><XCircle size={14}/> Inactivo</span>}
                 </td>
+                <td className="px-4 py-3">
+                  {estadoSeguridad(u) === 'bloqueado' ? (
+                    <span className="inline-flex items-center gap-1 text-red-700 text-xs font-medium">
+                      <ShieldAlert size={14}/> Bloqueado
+                    </span>
+                  ) : estadoSeguridad(u) === 'advertencia' ? (
+                    <span className="inline-flex items-center gap-1 text-amber-700 text-xs">
+                      <ShieldAlert size={14}/> {u.intentos_fallidos} intento{u.intentos_fallidos !== 1 ? 's' : ''}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-gray-300 text-xs">
+                      <ShieldCheck size={14}/>
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-500">
                   {u.ultimo_login ? new Date(u.ultimo_login).toLocaleString('es-CO') : '—'}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => abrirEditar(u)} className="text-primary hover:text-primary-dark">
-                    <Edit2 size={16}/>
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    {estadoSeguridad(u) !== 'ok' && (
+                      <button
+                        onClick={() => desbloquear(u)}
+                        title="Desbloquear cuenta"
+                        className="text-amber-600 hover:text-amber-800"
+                      >
+                        <Unlock size={15}/>
+                      </button>
+                    )}
+                    <button onClick={() => abrirEditar(u)} className="text-primary hover:text-primary-dark">
+                      <Edit2 size={16}/>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

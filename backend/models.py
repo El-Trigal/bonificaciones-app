@@ -509,6 +509,8 @@ class Usuario(Base):
     sede_id = Column(Integer, ForeignKey("sedes.id"), nullable=True)  # NULL = SUPER_ADMIN
     activo = Column(Boolean, default=True)
     ultimo_login = Column(DateTime, nullable=True)
+    intentos_fallidos = Column(Integer, default=0)
+    bloqueado_hasta = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

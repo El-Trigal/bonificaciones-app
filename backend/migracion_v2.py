@@ -136,6 +136,12 @@ def crear_admin_inicial(db):
     print("      [+] Usuario creado: admin / admin123 (cambiar en primer login)")
 
 
+def migrar_usuarios_seguridad():
+    print("[+] Agregando columnas de seguridad a usuarios...")
+    agregar_columna_si_falta("usuarios", "intentos_fallidos", "INTEGER DEFAULT 0")
+    agregar_columna_si_falta("usuarios", "bloqueado_hasta", "TIMESTAMP")
+
+
 def main():
     print("=" * 60)
     print("MIGRACION V2 - Sistema de Bonificaciones")
@@ -143,6 +149,7 @@ def main():
     try:
         crear_tablas_nuevas()
         migrar_semanas()
+        migrar_usuarios_seguridad()
         db = SessionLocal()
         try:
             sembrar_periodos_2026(db)
