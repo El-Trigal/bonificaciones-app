@@ -438,7 +438,8 @@ def calcular_bonif_apoyo(semana: str, labor: str, db: Session) -> list:
 
 def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
                                  registro_rendimiento_id=None, registro_labor_id=None,
-                                 carga_rendimiento_id=None, carga_labor_id=None):
+                                 carga_rendimiento_id=None, carga_labor_id=None,
+                                 sede_id=None):
     """Guarda la liquidación y los pasos de cálculo en la BD."""
     tipo_calculo = resultado["tipo_calculo"]
 
@@ -460,12 +461,15 @@ def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
         narrativo = generar_narrativo_labor_especifica(resultado)
 
     # Verificar si ya existe (idempotencia)
-    existente = db.query(Liquidacion).filter(
+    q_exist = db.query(Liquidacion).filter(
         Liquidacion.semana == resultado["semana"],
         Liquidacion.codigo_colaborador == resultado["codigo_colaborador"],
         Liquidacion.labor == resultado["labor"],
         Liquidacion.tipo_bonificacion == tipo_bonif,
-    ).first()
+    )
+    if sede_id:
+        q_exist = q_exist.filter(Liquidacion.sede_id == sede_id)
+    existente = q_exist.first()
 
     if existente:
         # Eliminar la liquidación existente (cascadea a pasos_calculo)
@@ -474,6 +478,7 @@ def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
 
     # Crear liquidación
     liq = Liquidacion(
+        sede_id=sede_id,
         semana=resultado["semana"],
         fecha_reporte=resultado.get("fecha_reporte"),
         codigo_colaborador=resultado["codigo_colaborador"],
@@ -510,6 +515,7 @@ def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
 
     # Guardar pasos de cálculo
     paso = PasoCalculo(
+        sede_id=sede_id,
         liquidacion_id=liq.id,
         semana=resultado["semana"],
         codigo_colaborador=resultado["codigo_colaborador"],
@@ -554,7 +560,7 @@ def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
     return liq
 
 
-def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Session) -> dict:
+def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Session, sede_id: int = None) -> dict:
     """
     Orquesta el cálculo completo para una semana y carga.
     tipo: "RENDIMIENTO" o "LABOR_ESPECIFICA"
@@ -569,10 +575,13 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
 
         for reg in registros:
             try:
-                labor = db.query(LaborRendimiento).filter(
+                labor_q = db.query(LaborRendimiento).filter(
                     LaborRendimiento.nombre == reg.labor,
                     LaborRendimiento.activo == True
-                ).first()
+                )
+                if sede_id:
+                    labor_q = labor_q.filter(LaborRendimiento.sede_id == sede_id)
+                labor = labor_q.first()
 
                 if not labor:
                     resultados["errores"].append(
@@ -585,6 +594,7 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
                     resultado, db,
                     registro_rendimiento_id=reg.id,
                     carga_rendimiento_id=carga_id,
+                    sede_id=sede_id,
                 )
                 resultados["procesados"] += 1
                 if resultado["total_bonificacion"] > 0:
@@ -611,6 +621,7 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
                     resultado, db,
                     registro_labor_id=reg.id,
                     carga_labor_id=carga_id,
+                    sede_id=sede_id,
                 )
                 resultados["procesados"] += 1
                 if resultado["total_bonificacion"] > 0:
@@ -642,6 +653,7 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
                         res_apoyo, db,
                         registro_labor_id=reg_original.id if reg_original else None,
                         carga_labor_id=carga_id,
+                        sede_id=sede_id,
                     )
                     resultados["procesados"] += 1
                     if res_apoyo["total_bonificacion"] > 0:

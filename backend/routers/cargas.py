@@ -183,7 +183,7 @@ async def cargar_rendimiento(
         db.add(reg)
 
     db.flush()
-    resultado_calculo = calcular_liquidacion_completa(semana, carga.id, "RENDIMIENTO", db)
+    resultado_calculo = calcular_liquidacion_completa(semana, carga.id, "RENDIMIENTO", db, sede_id=sede_id)
 
     return {
         "cargado": True,
@@ -274,7 +274,7 @@ async def cargar_labor_especifica(
         db.add(reg)
 
     db.flush()
-    resultado_calculo = calcular_liquidacion_completa(semana, carga.id, "LABOR_ESPECIFICA", db)
+    resultado_calculo = calcular_liquidacion_completa(semana, carga.id, "LABOR_ESPECIFICA", db, sede_id=sede_id)
 
     return {
         "cargado": True,

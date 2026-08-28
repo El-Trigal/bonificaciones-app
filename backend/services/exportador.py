@@ -7,15 +7,16 @@ from sqlalchemy import func
 from models import Liquidacion
 
 
-def generar_consolidado_nomina(semana: str, db: Session) -> str:
+def generar_consolidado_nomina(semana: str, db: Session, sede_id: int = None) -> str:
     """
     Genera CSV consolidado con formato listo para nómina.
     Agrupa por colaborador y tipo de bonificación.
     Formato: TIPO_BONIFICACION, CODIGO_COLABORADOR, NOMBRE_COLABORADOR, PERMANENCIA, RENDIMIENTO, TOTAL
     """
-    liquidaciones = db.query(Liquidacion).filter(
-        Liquidacion.semana == semana
-    ).order_by(
+    q = db.query(Liquidacion).filter(Liquidacion.semana == semana)
+    if sede_id:
+        q = q.filter(Liquidacion.sede_id == sede_id)
+    liquidaciones = q.order_by(
         Liquidacion.tipo_bonificacion,
         Liquidacion.codigo_colaborador
     ).all()
