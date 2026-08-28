@@ -30,10 +30,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS para desarrollo
+# CORS — en producción se leen orígenes desde ALLOWED_ORIGINS (separados por coma)
+_default_origins = "http://localhost:5173,http://localhost:8000,http://127.0.0.1:8000"
+_allowed = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=_allowed,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
