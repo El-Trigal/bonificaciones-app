@@ -31,13 +31,17 @@ def seed_database(db: Session):
     man = sedes["MAN"]  # sede principal para datos de ejemplo
 
     # ─── Usuario SUPER_ADMIN ────────────────────────────────
+    # La contraseña se toma de ADMIN_PASSWORD env var; si no existe genera una aleatoria
+    import os, secrets as _secrets
+    admin_password = os.environ.get("ADMIN_PASSWORD") or _secrets.token_urlsafe(16)
+    print(f"[SEED] Contraseña admin generada: {admin_password}  ← cámbiala después de entrar")
     db.add(Usuario(
         username="admin",
-        password_hash=hash_password("admin123"),
+        password_hash=hash_password(admin_password),
         nombre_completo="Administrador General",
         email="julian.guevara@floreseltrigal.com",
         rol="SUPER_ADMIN",
-        sede_id=None,  # SUPER_ADMIN no pertenece a una sede específica
+        sede_id=None,
         activo=True,
     ))
 

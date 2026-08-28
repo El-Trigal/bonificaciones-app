@@ -6,10 +6,13 @@ import sys
 # Agregar directorio backend al path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from database import engine, Base, SessionLocal
 from seed import seed_database
@@ -24,11 +27,26 @@ try:
 finally:
     db.close()
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Sistema de Bonificaciones - Flores El Trigal",
     description="Liquidación de bonificaciones - Sede Manantiales",
     version="1.0.0",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Cabeceras de seguridad HTTP
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 # CORS — en producción se leen orígenes desde ALLOWED_ORIGINS (separados por coma)
 _default_origins = "http://localhost:5173,http://localhost:8000,http://127.0.0.1:8000"

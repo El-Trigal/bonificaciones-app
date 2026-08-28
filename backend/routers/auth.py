@@ -1,10 +1,13 @@
 """Endpoints de autenticación y gestión de usuarios."""
 
+import os
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -16,8 +19,20 @@ from services.auth import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 ROLES_VALIDOS = list(PERMISOS.keys())
+
+# En producción (Render) las cookies deben ir con Secure+SameSite=None
+# para funcionar cross-domain (Netlify → Render).
+_IS_PROD = bool(os.environ.get("DATABASE_URL"))
+_COOKIE_KWARGS = dict(
+    httponly=True,
+    secure=_IS_PROD,
+    samesite="none" if _IS_PROD else "lax",
+    max_age=TOKEN_TTL_HOURS * 3600,
+    path="/",
+)
 
 
 class LoginIn(BaseModel):
@@ -84,23 +99,25 @@ def _to_out(u: Usuario, db: Session = None) -> UsuarioOut:
 
 
 @router.post("/login", response_model=UsuarioOut)
-def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, data: LoginIn, response: Response, db: Session = Depends(get_db)):
     user = db.query(Usuario).filter_by(username=data.username, activo=True).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
     user.ultimo_login = datetime.utcnow()
     db.commit()
     token = crear_token(user)
-    response.set_cookie(
-        key=COOKIE_NAME, value=token, httponly=True,
-        samesite="lax", max_age=TOKEN_TTL_HOURS * 3600, path="/",
-    )
+    response.set_cookie(key=COOKIE_NAME, value=token, **_COOKIE_KWARGS)
     return _to_out(user, db)
 
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(
+        COOKIE_NAME, path="/",
+        secure=_IS_PROD,
+        samesite="none" if _IS_PROD else "lax",
+    )
     return {"ok": True}
 
 
@@ -121,10 +138,7 @@ def cambiar_sede(
     if not sede:
         raise HTTPException(status_code=404, detail="Sede no encontrada")
     token = crear_token(user, sede_activa_id=sede_id)
-    response.set_cookie(
-        key=COOKIE_NAME, value=token, httponly=True,
-        samesite="lax", max_age=TOKEN_TTL_HOURS * 3600, path="/",
-    )
+    response.set_cookie(key=COOKIE_NAME, value=token, **_COOKIE_KWARGS)
     user._sede_activa_id = sede_id
     return _to_out(user, db)
 
