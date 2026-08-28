@@ -14,7 +14,7 @@ from models import Usuario
 
 SECRET_KEY = os.environ.get("BONIF_SECRET", "change-me-in-prod-please-a-long-random-string")
 ALGORITHM = "HS256"
-TOKEN_TTL_HOURS = 12
+TOKEN_TTL_HOURS = 2
 COOKIE_NAME = "bonif_token"
 
 

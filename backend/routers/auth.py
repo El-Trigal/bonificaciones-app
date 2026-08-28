@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -57,13 +57,28 @@ class UsuarioOut(BaseModel):
         from_attributes = True
 
 
+def _validar_password(pwd: str):
+    if len(pwd) < 8:
+        raise ValueError("Mínimo 8 caracteres")
+    if not any(c.isdigit() for c in pwd):
+        raise ValueError("Debe contener al menos un número")
+    if not any(c.isalpha() for c in pwd):
+        raise ValueError("Debe contener al menos una letra")
+
+
 class UsuarioCreate(BaseModel):
     username: str
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
     nombre_completo: str
     email: Optional[str] = None
     rol: str
     sede_id: Optional[int] = None  # NULL solo permitido para SUPER_ADMIN
+
+    @field_validator("password")
+    @classmethod
+    def password_seguro(cls, v):
+        _validar_password(v)
+        return v
 
 
 class UsuarioUpdate(BaseModel):
@@ -72,7 +87,14 @@ class UsuarioUpdate(BaseModel):
     rol: Optional[str] = None
     sede_id: Optional[int] = None
     activo: Optional[bool] = None
-    password: Optional[str] = Field(None, min_length=6)
+    password: Optional[str] = Field(None, min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def password_seguro(cls, v):
+        if v is not None:
+            _validar_password(v)
+        return v
 
 
 def _to_out(u: Usuario, db: Session = None) -> UsuarioOut:
