@@ -33,7 +33,6 @@ export default function Login() {
         <div className="text-center mb-8">
           <img src="/brand/logo/logo-navy.png" alt="Flores El Trigal" className="h-12 w-auto mx-auto mb-5" />
           <h1 className="text-2xl font-bold text-primary">Bonificaciones</h1>
-          <p className="text-sm text-gray-500 mt-1">Sede Manantiales</p>
         </div>
 
         {error && (
