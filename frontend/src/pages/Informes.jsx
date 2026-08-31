@@ -59,7 +59,7 @@ export default function Informes() {
             onClick={() => setActiveTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
               activeTab === t.key
-                ? 'border-emerald-600 text-emerald-700'
+                ? 'border-primary-600 text-primary-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -111,12 +111,12 @@ function TabHoras() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <select value={semana} onChange={(e) => { setSemana(e.target.value); if (e.target.value) setSelectedSemana(e.target.value); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Seleccionar semana</option>
           {semanas.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={lider} onChange={(e) => setLider(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Todos los líderes</option>
           {lideres.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
@@ -172,11 +172,11 @@ function TabHoras() {
                     <td className="px-4 py-2.5">{r.lider}</td>
                     <td className="px-4 py-2.5">{r.labor}</td>
                     <td className="px-4 py-2.5 text-right">{r.total_colaboradores}</td>
-                    <td className="px-4 py-2.5 text-right text-emerald-700 font-medium">{r.cumplieron}</td>
+                    <td className="px-4 py-2.5 text-right text-primary-700 font-medium">{r.cumplieron}</td>
                     <td className="px-4 py-2.5 text-right text-red-600 font-medium">{r.no_cumplieron}</td>
                     <td className="px-4 py-2.5 text-right">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        r.pct_cumplimiento >= 90 ? 'bg-emerald-100 text-emerald-800' :
+                        r.pct_cumplimiento >= 90 ? 'bg-primary-100 text-primary-800' :
                         r.pct_cumplimiento >= 70 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
                       }`}>
                         {r.pct_cumplimiento}%
@@ -226,14 +226,14 @@ function TabCalidad() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <select value={semana} onChange={(e) => { setSemana(e.target.value); if (e.target.value) setSelectedSemana(e.target.value); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Seleccionar semana</option>
           {semanas.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <input type="text" value={labor} onChange={(e) => setLabor(e.target.value)} placeholder="Labor"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent" />
         <select value={lider} onChange={(e) => setLider(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Todos los líderes</option>
           {lideres.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
@@ -330,16 +330,16 @@ function TabEficiencia() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <input type="text" value={desde} onChange={(e) => setDesde(e.target.value)} placeholder="Desde (2026-01)"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent" />
         <input type="text" value={hasta} onChange={(e) => setHasta(e.target.value)} placeholder="Hasta (2026-14)"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent" />
         <select value={lider} onChange={(e) => setLider(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Todos los líderes</option>
           {lideres.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
         <button onClick={handleBuscar}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
           Consultar
         </button>
         <button onClick={() => exportCSV(data, `eficiencia_${desde}_${hasta}.csv`)}
@@ -423,9 +423,9 @@ function TabFestivos() {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <input type="text" value={anio} onChange={(e) => setAnio(e.target.value)} placeholder="Año"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-24 focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-24 focus:ring-2 focus:ring-accent" />
         <button onClick={handleBuscar}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
           Consultar
         </button>
         <button onClick={() => exportCSV(detalle, `festivos_${anio}.csv`)}
@@ -448,7 +448,7 @@ function TabFestivos() {
             </div>
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 text-center">
               <p className="text-xs text-gray-500 uppercase">Impacto Porcentual</p>
-              <p className={`text-xl font-bold mt-1 ${(resumen.impacto_porcentual || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+              <p className={`text-xl font-bold mt-1 ${(resumen.impacto_porcentual || 0) >= 0 ? 'text-primary-700' : 'text-red-700'}`}>
                 {resumen.impacto_porcentual > 0 ? '+' : ''}{resumen.impacto_porcentual}%
               </p>
             </div>
@@ -471,7 +471,7 @@ function TabFestivos() {
                 </BarChart>
               </ResponsiveContainer>
               <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-600 inline-block"></span> Semana normal</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary-600 inline-block"></span> Semana normal</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-600 inline-block"></span> Semana con festivo</span>
               </div>
             </div>
@@ -546,23 +546,23 @@ function TabSinBonificacion() {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <input type="text" value={desde} onChange={(e) => setDesde(e.target.value)} placeholder="Desde"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent" />
         <input type="text" value={hasta} onChange={(e) => setHasta(e.target.value)} placeholder="Hasta"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent" />
         <select value={lider} onChange={(e) => setLider(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Todos los líderes</option>
           {lideres.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
         <select value={motivo} onChange={(e) => setMotivo(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent">
           <option value="">Todos los motivos</option>
           <option value="NO_CUMPLE_HORAS">No cumple horas</option>
           <option value="NO_CUMPLE_CALIDAD">No cumple calidad</option>
           <option value="NO_SUPERA_MINIMO">No supera mínimo</option>
         </select>
         <button onClick={handleBuscar}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
           Consultar
         </button>
         <button onClick={() => exportCSV(data, 'sin_bonificacion.csv')}
@@ -636,14 +636,14 @@ function TabEvolucion() {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input type="text" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Código del colaborador"
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500" />
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent" />
         </div>
         <input type="text" value={desde} onChange={(e) => setDesde(e.target.value)} placeholder="Desde"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 w-32" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent w-32" />
         <input type="text" value={hasta} onChange={(e) => setHasta(e.target.value)} placeholder="Hasta"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 w-32" />
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent w-32" />
         <button onClick={handleBuscar}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700">
           Consultar
         </button>
         <button onClick={() => exportCSV(datos, `evolucion_${codigo}.csv`)}
@@ -655,7 +655,7 @@ function TabEvolucion() {
       {loading ? <LoadingSpinner /> : data && (
         <>
           {data.colaborador && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm">
+            <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 text-sm">
               <strong>{data.colaborador.nombre}</strong> - Código: {data.colaborador.codigo}
             </div>
           )}
@@ -705,7 +705,7 @@ function TabEvolucion() {
                     <td className="px-4 py-2.5 text-right">{r.unidades_ejecutadas}</td>
                     <td className="px-4 py-2.5 text-right">{r.unidades_adicionales}</td>
                     <td className="px-4 py-2.5 text-right">{r.pct_calidad}%</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700"><FormatCOP value={r.total_bonificacion} /></td>
+                    <td className="px-4 py-2.5 text-right font-bold text-primary-700"><FormatCOP value={r.total_bonificacion} /></td>
                     <td className="px-4 py-2.5 text-center">{r.cumple_horas ? '✓' : '✗'}</td>
                     <td className="px-4 py-2.5 text-center">{r.cumple_calidad ? '✓' : '✗'}</td>
                     <td className="px-4 py-2.5 text-center">{r.supero_minimo ? '✓' : '✗'}</td>

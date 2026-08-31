@@ -66,13 +66,13 @@ export default function Dashboard() {
     : [];
 
   const colorMap = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    emerald: 'bg-primary-50 text-primary-700 border-primary-200',
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
     violet: 'bg-violet-50 text-violet-700 border-violet-200',
     amber: 'bg-amber-50 text-amber-700 border-amber-200',
   };
   const iconBg = {
-    emerald: 'bg-emerald-100 text-emerald-600',
+    emerald: 'bg-primary-100 text-primary-600',
     blue: 'bg-blue-100 text-blue-600',
     violet: 'bg-violet-100 text-violet-600',
     amber: 'bg-amber-100 text-amber-600',
@@ -110,7 +110,7 @@ export default function Dashboard() {
           <select
             value={selectedSemana || ''}
             onChange={(e) => setSelectedSemana(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-accent focus:border-primary-500"
           >
             <option value="">Seleccionar semana</option>
             {semanas.map((s) => (
@@ -122,7 +122,7 @@ export default function Dashboard() {
           <button
             onClick={handleExportar}
             disabled={!selectedSemana || exportando}
-            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-4 h-4" />
             {exportando ? 'Exportando...' : 'Exportar Consolidado'}
@@ -184,12 +184,12 @@ export default function Dashboard() {
                       <td className="px-6 py-3 text-right"><FormatCOP value={r.labor_especifica} /></td>
                       <td className="px-6 py-3 text-right"><FormatCOP value={r.apoyo} /></td>
                       <td className="px-6 py-3 text-right"><FormatCOP value={r.auxilio_constitutiva} /></td>
-                      <td className="px-6 py-3 text-right font-semibold text-emerald-700"><FormatCOP value={r.total} /></td>
+                      <td className="px-6 py-3 text-right font-semibold text-primary-700"><FormatCOP value={r.total} /></td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-emerald-50 font-bold text-emerald-900">
+                  <tr className="bg-primary-50 font-bold text-primary-900">
                     <td className="px-6 py-3">TOTAL</td>
                     <td className="px-6 py-3 text-right"><FormatCOP value={totalesFooter.rendimiento} /></td>
                     <td className="px-6 py-3 text-right"><FormatCOP value={totalesFooter.labor_especifica} /></td>

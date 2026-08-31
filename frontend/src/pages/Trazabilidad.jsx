@@ -92,14 +92,14 @@ export default function Trazabilidad() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Ej: 12345 o Juan Pérez"
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-primary-500"
               />
             </div>
           </div>
           <button
             type="submit"
             disabled={loading || !busqueda.trim()}
-            className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="bg-primary-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Buscando...' : 'Buscar'}
           </button>
@@ -121,8 +121,8 @@ export default function Trazabilidad() {
           {/* Employee card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
-                <User className="w-7 h-7 text-emerald-700" />
+              <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center">
+                <User className="w-7 h-7 text-primary-700" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">{colaborador.nombre}</h2>
@@ -139,7 +139,7 @@ export default function Trazabilidad() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 uppercase">Total Bonif.</p>
-                  <p className="text-xl font-bold text-emerald-700">
+                  <p className="text-xl font-bold text-primary-700">
                     {fmtCOP(resumenSemana.reduce((s, r) => s + (r.total || 0), 0))}
                   </p>
                 </div>
@@ -151,7 +151,7 @@ export default function Trazabilidad() {
           {chartData.length > 1 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                <TrendingUp className="w-5 h-5 text-primary-600" />
                 Evolución de Bonificación por Semana
               </h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -172,12 +172,12 @@ export default function Trazabilidad() {
             <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3">
               <Calendar className="w-4 h-4 text-gray-400" />
               <select value={filtroSemana} onChange={(e) => setFiltroSemana(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500">
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent">
                 <option value="">Todas las semanas</option>
                 {semanasUnicas.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500">
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-accent">
                 <option value="">Todos los tipos</option>
                 {tiposUnicos.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -208,7 +208,7 @@ export default function Trazabilidad() {
                       <td className="px-4 py-2.5 text-gray-600">{item.semana}</td>
                       <td className="px-4 py-2.5">{item.labor}</td>
                       <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">{item.tipo_bonificacion}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">{item.tipo_bonificacion}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_rendimiento} /></td>
                       <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_he_ordinaria} /></td>
@@ -218,10 +218,10 @@ export default function Trazabilidad() {
                       <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_apoyo} /></td>
                       <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_auxilio} /></td>
                       <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_constitutiva} /></td>
-                      <td className="px-4 py-2.5 text-right font-bold text-emerald-700"><FormatCOP value={item.total_bonificacion} /></td>
+                      <td className="px-4 py-2.5 text-right font-bold text-primary-700"><FormatCOP value={item.total_bonificacion} /></td>
                       <td className="px-4 py-2.5">
                         <button onClick={() => handleVerDetalle(item.id)}
-                          className="text-emerald-600 hover:text-emerald-800 text-xs font-medium">
+                          className="text-primary-600 hover:text-primary-800 text-xs font-medium">
                           Ver detalle
                         </button>
                       </td>

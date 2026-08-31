@@ -3,20 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #065f46;
-  --color-primary-dark: #064e3b;
-  --color-primary-light: #059669;
-  --color-primary-pale: #d1fae5;
-  --color-accent: #10b981;
-  --color-danger: #dc2626;
-  --color-warning: #f59e0b;
-  --color-info: #3b82f6;
+  /* Flores El Trigal — brand tokens */
+  --color-primary: #1F3361;
+  --color-primary-dark: #14223F;
+  --color-primary-light: #263E6E;
+  --color-primary-pale: #DCE2F0;
+  --color-accent: #FFD40A;
+  --color-danger: #D6453B;
+  --color-warning: #E6BD00;
+  --color-info: #263E6E;
+  --color-exito: #2F9E5B;
   --sidebar-width: 240px;
 }
 
 @layer base {
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Montserrat', system-ui, sans-serif;
   }
 }
 
@@ -24,13 +26,19 @@
   .btn-primary {
     @apply bg-primary text-white px-4 py-2 rounded-lg font-medium
            hover:bg-primary-dark transition-colors duration-150
-           focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
   }
 
   .btn-secondary {
     @apply bg-white text-primary border border-primary px-4 py-2 rounded-lg font-medium
            hover:bg-primary-pale transition-colors duration-150
-           focus:outline-none focus:ring-2 focus:ring-primary-light focus:ring-offset-2;
+           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+  }
+
+  .btn-accent {
+    @apply bg-accent text-primary px-4 py-2 rounded-lg font-semibold
+           hover:bg-accent-600 transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
   }
 
   .card {
@@ -39,7 +47,7 @@
 
   .input-field {
     @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-           focus:outline-none focus:ring-2 focus:ring-primary-light focus:border-primary-light
+           focus:outline-none focus:ring-2 focus:ring-accent focus:border-primary-light
            placeholder-gray-400;
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogIn, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
 export default function Login() {
@@ -28,14 +28,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-700 to-primary-500 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-white mb-4">
-            <LogIn size={28} />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Bonificaciones</h1>
-          <p className="text-sm text-gray-500 mt-1">Flores El Trigal — Sede Manantiales</p>
+          <img src="/brand/logo/logo-navy.png" alt="Flores El Trigal" className="h-12 w-auto mx-auto mb-5" />
+          <h1 className="text-2xl font-bold text-primary">Bonificaciones</h1>
+          <p className="text-sm text-gray-500 mt-1">Sede Manantiales</p>
         </div>
 
         {error && (
@@ -53,7 +51,7 @@ export default function Login() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-primary"
             />
           </div>
           <div>
@@ -63,13 +61,13 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-primary"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary-dark disabled:opacity-50 transition"
+            className="w-full bg-accent text-primary py-2.5 rounded-lg font-semibold hover:bg-accent-600 disabled:opacity-50 transition focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-2"
           >
             {loading ? 'Ingresando...' : 'Iniciar sesión'}
           </button>

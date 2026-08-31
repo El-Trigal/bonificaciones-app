@@ -16,7 +16,7 @@ export default function Catalogos() {
         {tabs.map((t, i) => (
           <button key={t} onClick={() => setActiveTab(i)}
             className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
-              activeTab === i ? 'bg-white border border-b-white text-emerald-800 -mb-px' : 'text-gray-500 hover:text-gray-700'
+              activeTab === i ? 'bg-white border border-b-white text-primary-800 -mb-px' : 'text-gray-500 hover:text-gray-700'
             }`}>{t}</button>
         ))}
       </div>
@@ -90,7 +90,7 @@ function TabEmpleados() {
             <input type="file" accept=".csv" onChange={importarCSV} className="hidden" />
           </label>
           <button onClick={() => { setForm({ codigo: '', nombre: '', cargo: 'OPERARIO' }); setModal('crear'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
             <Plus size={16} /> Agregar
           </button>
         </div>
@@ -149,7 +149,7 @@ function TabEmpleados() {
             <input type="text" value={form.cargo} onChange={e => setForm({...form, cargo: e.target.value})}
               className="w-full border rounded-lg px-3 py-2" />
           </div>
-          <button onClick={guardar} className="w-full py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800">
+          <button onClick={guardar} className="w-full py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800">
             <Save size={16} className="inline mr-2" />Guardar
           </button>
         </div>
@@ -249,11 +249,11 @@ function TabLabores() {
         <h3 className="font-semibold text-gray-700">Labores de Rendimiento</h3>
         <div className="flex gap-2">
           <button onClick={recomputarLideres} disabled={recomputando}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-700 text-emerald-700 rounded-lg text-sm hover:bg-emerald-50 disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-primary-700 text-primary-700 rounded-lg text-sm hover:bg-primary-50 disabled:opacity-50">
             {recomputando ? 'Recomputando...' : 'Recomputar líderes en registros'}
           </button>
           <button onClick={() => { setForm({...defaults}); setModal('crear'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
             <Plus size={16} /> Agregar
           </button>
         </div>
@@ -339,18 +339,18 @@ function TabLabores() {
         </div>
 
         {derivados && (
-          <div className="mt-6 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-            <h4 className="font-semibold text-emerald-800 mb-2">Valores calculados (preview)</h4>
+          <div className="mt-6 p-4 bg-primary-50 rounded-lg border border-primary-200">
+            <h4 className="font-semibold text-primary-800 mb-2">Valores calculados (preview)</h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>Costo estándar/tallo: <span className="font-mono font-bold">{fmt(derivados.costo_estandar_tallo)}</span></div>
               <div>Costo estándar/ramo: <span className="font-mono font-bold">{fmt(derivados.costo_estandar_ramo)}</span></div>
-              <div>Valor unid. colaborador: <span className="font-mono font-bold text-emerald-700">{fmt(derivados.valor_unidad_colaborador)}</span></div>
-              <div>Valor unid. apoyo: <span className="font-mono font-bold text-emerald-700">{fmt(derivados.valor_unidad_apoyo)}</span></div>
+              <div>Valor unid. colaborador: <span className="font-mono font-bold text-primary-700">{fmt(derivados.valor_unidad_colaborador)}</span></div>
+              <div>Valor unid. apoyo: <span className="font-mono font-bold text-primary-700">{fmt(derivados.valor_unidad_apoyo)}</span></div>
             </div>
           </div>
         )}
 
-        <button onClick={guardar} className="w-full mt-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800">
+        <button onClick={guardar} className="w-full mt-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800">
           <Save size={16} className="inline mr-2" />Guardar
         </button>
       </Modal>
@@ -488,7 +488,7 @@ function TabMaestros() {
       <div className="flex gap-2 mb-4">
         {subTabs.map((t, i) => (
           <button key={t} onClick={() => setSubTab(i)}
-            className={`px-3 py-1.5 rounded-lg text-sm ${subTab === i ? 'bg-emerald-100 text-emerald-800 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm ${subTab === i ? 'bg-primary-100 text-primary-800 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}>
             {t}
           </button>
         ))}
@@ -548,7 +548,7 @@ function CrudSimple({ endpoint, label }) {
           onKeyDown={e => e.key === 'Enter' && agregar()}
           className="border rounded-lg px-3 py-2 text-sm flex-1" />
         <button onClick={agregar}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">
+          className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
           <Plus size={16} /> Agregar
         </button>
       </div>
@@ -571,7 +571,7 @@ function CrudSimple({ endpoint, label }) {
                     {(laboresPorLider[item.id] || []).length === 0
                       ? <span className="text-gray-400 italic">Sin labores asignadas</span>
                       : (laboresPorLider[item.id] || []).map((n, i) => (
-                          <span key={i} className="inline-block bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded mr-1 mb-1">{n}</span>
+                          <span key={i} className="inline-block bg-primary-50 text-primary-800 px-2 py-0.5 rounded mr-1 mb-1">{n}</span>
                         ))
                     }
                   </td>

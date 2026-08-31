@@ -104,7 +104,7 @@ export default function Liquidaciones() {
         </div>
         <button
           onClick={handleExportar}
-          className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+          className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
         >
           <Download className="w-4 h-4" /> Exportar CSV
         </button>
@@ -117,17 +117,17 @@ export default function Liquidaciones() {
         </div>
         <form onSubmit={handleBuscar} className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <select value={semana} onChange={(e) => { setSemana(e.target.value); if (e.target.value) setSelectedSemana(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-primary-500">
             <option value="">Todas las semanas</option>
             {semanas.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={lider} onChange={(e) => { setLider(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-primary-500">
             <option value="">Todos los líderes</option>
             {lideres.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
           <select value={tipo} onChange={(e) => { setTipo(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-primary-500">
             <option value="">Todos los tipos</option>
             {tipos.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -138,11 +138,11 @@ export default function Liquidaciones() {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar colaborador..."
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-primary-500"
             />
           </div>
           <button type="submit"
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
             Buscar
           </button>
         </form>
@@ -191,7 +191,7 @@ export default function Liquidaciones() {
                     <td className="px-4 py-2.5 text-gray-600">{item.lider}</td>
                     <td className="px-4 py-2.5 text-gray-600">{item.labor}</td>
                     <td className="px-4 py-2.5">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">{item.tipo_bonificacion}</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">{item.tipo_bonificacion}</span>
                     </td>
                     <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_rendimiento} /></td>
                     <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_he_ordinaria} /></td>
@@ -201,12 +201,12 @@ export default function Liquidaciones() {
                     <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_apoyo} /></td>
                     <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_auxilio} /></td>
                     <td className="px-4 py-2.5 text-right"><FormatCOP value={item.bonif_constitutiva} /></td>
-                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700"><FormatCOP value={item.total_bonificacion} /></td>
+                    <td className="px-4 py-2.5 text-right font-bold text-primary-700"><FormatCOP value={item.total_bonificacion} /></td>
                     <td className="px-4 py-2.5 text-center"><StatusBadge value={item.cumple_minimo_horas} /></td>
                     <td className="px-4 py-2.5 text-center"><StatusBadge value={item.cumple_minimo_calidad} /></td>
                     <td className="px-4 py-2.5">
                       <button onClick={() => handleVerDetalle(item.id)}
-                        className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800 text-xs font-medium">
+                        className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 text-xs font-medium">
                         <Eye className="w-3.5 h-3.5" /> Ver detalle
                       </button>
                     </td>
@@ -258,7 +258,7 @@ function TrazabilidadContent({ data }) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="bg-emerald-50 rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      <div className="bg-primary-50 rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <div><span className="text-gray-500">Colaborador:</span> <strong>{liquidacion?.nombre_colaborador}</strong></div>
         <div><span className="text-gray-500">Código:</span> <strong>{liquidacion?.codigo_colaborador}</strong></div>
         <div><span className="text-gray-500">Semana:</span> <strong>{liquidacion?.semana}</strong></div>
@@ -279,7 +279,7 @@ function TrazabilidadContent({ data }) {
 
       {/* Resultado final */}
       {detalle_calculo?.resultado_final !== undefined && (
-        <div className="bg-emerald-600 text-white rounded-lg p-4 text-center">
+        <div className="bg-primary-600 text-white rounded-lg p-4 text-center">
           <p className="text-sm opacity-90">Resultado Final</p>
           <p className="text-2xl font-bold">{fmtCOP(detalle_calculo.resultado_final)}</p>
         </div>
@@ -306,7 +306,7 @@ function RendimientoPasos({ pasos }) {
       {pasos.map((paso, idx) => (
         <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-2 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">
+            <span className="w-6 h-6 rounded-full bg-primary-600 text-white text-xs flex items-center justify-center font-bold">
               {paso.paso}
             </span>
             <span className="text-sm font-semibold text-gray-800">{paso.nombre}</span>
@@ -374,7 +374,7 @@ function PasoDetalle({ paso }) {
         <div className="flex items-center gap-2">
           <span className="font-medium">Cumple mínimo horas:</span>
           {d.cumple ? (
-            <span className="flex items-center gap-1 text-emerald-600"><CheckCircle className="w-4 h-4" /> Sí</span>
+            <span className="flex items-center gap-1 text-primary-600"><CheckCircle className="w-4 h-4" /> Sí</span>
           ) : (
             <span className="flex items-center gap-1 text-red-600"><XCircle className="w-4 h-4" /> No</span>
           )}
@@ -391,7 +391,7 @@ function PasoDetalle({ paso }) {
         <div className="flex items-center gap-2">
           <span className="font-medium">Cumple calidad:</span>
           {d.cumple ? (
-            <span className="flex items-center gap-1 text-emerald-600"><CheckCircle className="w-4 h-4" /> Sí</span>
+            <span className="flex items-center gap-1 text-primary-600"><CheckCircle className="w-4 h-4" /> Sí</span>
           ) : (
             <span className="flex items-center gap-1 text-red-600"><XCircle className="w-4 h-4" /> No</span>
           )}
@@ -444,7 +444,7 @@ function PasoDetalle({ paso }) {
       <div className="space-y-2">
         {d.formula && <p className="font-mono bg-gray-100 rounded p-2 text-xs">{d.formula}</p>}
         {d.total !== undefined && (
-          <p className="text-lg font-bold text-emerald-700">{fmtCOP(d.total)}</p>
+          <p className="text-lg font-bold text-primary-700">{fmtCOP(d.total)}</p>
         )}
         {renderKeyValue(d, ['formula', 'total'])}
       </div>
