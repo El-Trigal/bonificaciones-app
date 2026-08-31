@@ -16,9 +16,14 @@ from slowapi.errors import RateLimitExceeded
 
 from database import engine, Base, SessionLocal
 from seed import seed_database
+from migracion_v2 import migrar_usuarios_seguridad
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
+
+# create_all no altera tablas ya existentes: columnas nuevas en modelos ya
+# desplegados deben agregarse explícitamente (idempotente, seguro en cada arranque)
+migrar_usuarios_seguridad()
 
 # Seed de datos iniciales
 db = SessionLocal()
@@ -31,11 +36,19 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="Sistema de Bonificaciones - Flores El Trigal",
-    description="Liquidación de bonificaciones - Sede Manantiales",
+    description="Liquidación de bonificaciones",
     version="1.0.0",
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Un error no controlado que escapa hasta aquí sigue pasando por
+    # CORSMiddleware (a diferencia del 500 genérico de Starlette), evitando
+    # que el navegador lo reporte como bloqueo de CORS en vez del error real.
+    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
 
 # Cabeceras de seguridad HTTP
 @app.middleware("http")
