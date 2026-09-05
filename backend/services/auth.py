@@ -18,6 +18,9 @@ TOKEN_TTL_HOURS = 2
 COOKIE_NAME = "bonif_token"
 
 
+# Roles que pueden operar en múltiples sedes (no tienen sede_id fijo)
+ROLES_MULTISEDE = {"SUPER_ADMIN", "LECTOR_GLOBAL"}
+
 # Matriz de permisos por rol
 PERMISOS = {
     "SUPER_ADMIN": {
@@ -27,6 +30,12 @@ PERMISOS = {
         "cerrar_periodo", "marcar_pagado", "aprobar_retroactivos",
         "gestionar_usuarios", "auditoria_completa",
         "gestionar_sedes", "cambiar_sede",
+        "descargar_todas_sedes",
+    },
+    "LECTOR_GLOBAL": {
+        # Solo lectura, acceso a todas las sedes mediante SedeSwitcher
+        "ver_dashboard", "ver_liquidaciones", "ver_trazabilidad", "ver_informes",
+        "cambiar_sede", "descargar_todas_sedes",
     },
     "ADMIN": {
         "cargar_archivos", "editar_registros", "ejecutar_calculo",
@@ -107,9 +116,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Usuario
     return user
 
 
-def get_sede_activa(user: Usuario) -> Optional[int]:
-    """Devuelve el sede_id en contexto para filtrar queries."""
-    return getattr(user, "_sede_activa_id", user.sede_id)
+def get_sede_activa(user: Usuario) -> int:
+    """Devuelve el sede_id en contexto para filtrar queries.
+    Lanza 400 si el usuario multi-sede no ha seleccionado una sede activa.
+    """
+    sede = getattr(user, "_sede_activa_id", user.sede_id)
+    if sede is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Debes seleccionar una sede antes de continuar. "
+                   "Usa el selector de sede en el menú lateral.",
+        )
+    return sede
 
 
 def requiere_permiso(permiso: str):

@@ -104,7 +104,7 @@ export default function Sidebar() {
             <p className="text-primary-300 text-xs">Flores El Trigal &middot; v2.0</p>
           </div>
         </div>
-        {user?.rol === 'SUPER_ADMIN' && <SedeSwitcher user={user} inHeader />}
+        {['SUPER_ADMIN', 'LECTOR_GLOBAL'].includes(user?.rol) && <SedeSwitcher user={user} />}
       </div>
 
       <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">

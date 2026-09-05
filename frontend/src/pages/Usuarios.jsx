@@ -5,7 +5,19 @@ import Modal from '../components/shared/Modal';
 import useAuthStore from '../store/authStore';
 
 const ROLES_ADMIN = ['ADMIN', 'AUXILIAR', 'NOMINA', 'OPERARIO'];
-const ROLES_SUPER = ['SUPER_ADMIN', 'ADMIN', 'AUXILIAR', 'NOMINA', 'OPERARIO'];
+const ROLES_SUPER = ['SUPER_ADMIN', 'LECTOR_GLOBAL', 'ADMIN', 'AUXILIAR', 'NOMINA', 'OPERARIO'];
+
+// Roles que no necesitan una sede fija (usan SedeSwitcher)
+const ROLES_MULTISEDE = ['SUPER_ADMIN', 'LECTOR_GLOBAL'];
+
+const DESCRIPCION_ROL = {
+  SUPER_ADMIN:    'Acceso total a todas las sedes y configuración global.',
+  LECTOR_GLOBAL:  'Solo lectura. Puede ver informes de todas las sedes sin editar nada.',
+  ADMIN:          'Administrador de una sede: gestión completa de datos y usuarios.',
+  AUXILIAR:       'Carga y edición de registros en su sede.',
+  NOMINA:         'Carga, cálculo y cierre de periodos de nómina.',
+  OPERARIO:       'Ingreso básico de datos.',
+};
 
 export default function Usuarios() {
   const { user: yo, sedes, fetchSedes, can } = useAuthStore();
@@ -101,7 +113,7 @@ export default function Usuarios() {
   }
 
   const rolesDisponibles = esSuperAdmin ? ROLES_SUPER : ROLES_ADMIN;
-  const necesitaSede = form.rol && form.rol !== 'SUPER_ADMIN';
+  const necesitaSede = form.rol && !ROLES_MULTISEDE.includes(form.rol);
 
   return (
     <div className="p-6">
@@ -239,6 +251,9 @@ export default function Usuarios() {
               >
                 {rolesDisponibles.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
+              {form.rol && DESCRIPCION_ROL[form.rol] && (
+                <p className="mt-1 text-xs text-gray-500">{DESCRIPCION_ROL[form.rol]}</p>
+              )}
             </div>
 
             {/* Selector de sede: visible para SUPER_ADMIN cuando el rol elegido no es SUPER_ADMIN */}
