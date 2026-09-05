@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import ExcelUploadModal from '../components/shared/ExcelUploadModal';
 import { Plus, Upload, Pencil, Trash2, Save, X } from 'lucide-react';
 
 const tabs = ['Empleados', 'Labores de Rendimiento', 'Semanas', 'Maestros Generales'];
@@ -28,6 +29,15 @@ export default function Catalogos() {
   );
 }
 
+const EXCEL_EMPLEADOS_CONFIG = {
+  titulo: 'Importar Empleados',
+  descripcion: 'Carga masiva desde el archivo Excel de RR.HH.',
+  columnas_requeridas: ['ID', 'NOMBRE'],
+  columnas_opcionales: ['CARGO'],
+  endpoint_validar: '/catalogos/empleados/validar-excel',
+  endpoint_confirmar: '/catalogos/empleados/confirmar-excel',
+};
+
 // ─── Tab Empleados ─────────────────────────────────────
 function TabEmpleados() {
   const [empleados, setEmpleados] = useState([]);
@@ -35,6 +45,7 @@ function TabEmpleados() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'crear' | empleado obj
   const [form, setForm] = useState({ codigo: '', nombre: '', cargo: 'OPERARIO' });
+  const [importModal, setImportModal] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -65,19 +76,6 @@ function TabEmpleados() {
     cargar();
   };
 
-  const importarCSV = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('archivo', file);
-    try {
-      const { data } = await api.post('/catalogos/empleados/importar-csv', fd);
-      alert(`Creados: ${data.creados}, Actualizados: ${data.actualizados}${data.errores?.length ? '\nErrores: ' + data.errores.join(', ') : ''}`);
-      cargar();
-    } catch (e) { alert('Error al importar'); }
-    e.target.value = '';
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex items-center justify-between mb-4">
@@ -85,16 +83,25 @@ function TabEmpleados() {
           onChange={e => setBuscar(e.target.value)}
           className="border rounded-lg px-3 py-2 text-sm w-72" />
         <div className="flex gap-2">
-          <label className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm cursor-pointer hover:bg-gray-200">
-            <Upload size={16} /> Importar CSV
-            <input type="file" accept=".csv" onChange={importarCSV} className="hidden" />
-          </label>
+          <button
+            onClick={() => setImportModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200"
+          >
+            <Upload size={16} /> Importar Excel
+          </button>
           <button onClick={() => { setForm({ codigo: '', nombre: '', cargo: 'OPERARIO' }); setModal('crear'); }}
             className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
             <Plus size={16} /> Agregar
           </button>
         </div>
       </div>
+
+      <ExcelUploadModal
+        isOpen={importModal}
+        onClose={() => setImportModal(false)}
+        onSuccess={() => { setImportModal(false); cargar(); }}
+        config={EXCEL_EMPLEADOS_CONFIG}
+      />
 
       {loading ? <LoadingSpinner /> : (
         <table className="w-full text-sm">

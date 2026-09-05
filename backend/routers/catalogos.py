@@ -2,6 +2,7 @@
 
 import csv
 import io
+import openpyxl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -120,6 +121,159 @@ async def importar_empleados_csv(
                 creados += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)}")
+
+    db.commit()
+    return {"creados": creados, "actualizados": actualizados, "errores": errores}
+
+
+def _parsear_excel_empleados(contenido_bytes: bytes) -> tuple[list[dict], list[str]]:
+    """Lee el Excel de RR.HH. y mapea las columnas al modelo interno.
+    Retorna (filas_validas, errores). Cada fila válida tiene: codigo, nombre, cargo.
+    """
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(contenido_bytes), read_only=True, data_only=True)
+        ws = wb.active
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo leer el archivo Excel: {e}")
+
+    filas = list(ws.iter_rows(values_only=True))
+    if not filas:
+        raise HTTPException(400, "El archivo está vacío")
+
+    # Detectar fila de encabezados (primera fila con la columna "ID" o "NOMBRE")
+    header_row_idx = None
+    headers = []
+    for idx, row in enumerate(filas):
+        row_str = [str(c).strip().upper() if c is not None else "" for c in row]
+        if "ID" in row_str and "NOMBRE" in row_str:
+            header_row_idx = idx
+            headers = row_str
+            break
+
+    if header_row_idx is None:
+        raise HTTPException(400, "No se encontraron las columnas requeridas: ID y NOMBRE")
+
+    def col(name: str):
+        try:
+            return headers.index(name)
+        except ValueError:
+            return None
+
+    idx_id = col("ID")
+    idx_nombre = col("NOMBRE")
+    idx_cargo = col("CARGO")
+
+    validas = []
+    errores = []
+
+    for fila_num, row in enumerate(filas[header_row_idx + 1:], start=header_row_idx + 2):
+        # Ignorar filas completamente vacías
+        if all(c is None or str(c).strip() == "" for c in row):
+            continue
+
+        raw_id = str(row[idx_id]).strip() if row[idx_id] is not None else ""
+        raw_nombre = str(row[idx_nombre]).strip() if row[idx_nombre] is not None else ""
+        raw_cargo = str(row[idx_cargo]).strip() if (idx_cargo is not None and row[idx_cargo] is not None) else ""
+
+        # Ignorar la columna ITEM (números de fila del Excel)
+        fila_errores = []
+
+        # ID requerido y debe ser entero
+        try:
+            codigo = int(float(raw_id)) if raw_id else None
+        except (ValueError, TypeError):
+            codigo = None
+
+        if not raw_id:
+            fila_errores.append("ID vacío")
+        elif codigo is None:
+            fila_errores.append(f"ID no es un número válido: '{raw_id}'")
+
+        # Nombre requerido
+        if not raw_nombre:
+            fila_errores.append("NOMBRE vacío")
+
+        if fila_errores:
+            errores.append(f"Fila {fila_num}: {', '.join(fila_errores)}")
+            continue
+
+        validas.append({
+            "codigo": codigo,
+            "nombre": raw_nombre,
+            "cargo": raw_cargo or "OPERARIO",
+        })
+
+    return validas, errores
+
+
+@router.post("/empleados/validar-excel")
+async def validar_empleados_excel(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    if not archivo.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "El archivo debe ser Excel (.xlsx o .xls)")
+
+    sede_id = get_sede_activa(user)
+    contenido = await archivo.read()
+    validas, errores = _parsear_excel_empleados(contenido)
+
+    # Clasificar cada fila válida: nueva o actualización
+    nuevos = []
+    actualizaciones = []
+    for fila in validas:
+        existente = db.query(Empleado).filter_by(sede_id=sede_id, codigo=fila["codigo"]).first()
+        if existente:
+            cambios = []
+            if existente.nombre != fila["nombre"]:
+                cambios.append(f"nombre: '{existente.nombre}' → '{fila['nombre']}'")
+            if (existente.cargo or "OPERARIO") != fila["cargo"]:
+                cambios.append(f"cargo: '{existente.cargo}' → '{fila['cargo']}'")
+            actualizaciones.append({**fila, "cambios": cambios})
+        else:
+            nuevos.append(fila)
+
+    return {
+        "total_filas": len(validas) + len(errores),
+        "validas": len(validas),
+        "errores": errores,
+        "preview": {
+            "nuevos": nuevos,
+            "actualizaciones": actualizaciones,
+        },
+    }
+
+
+@router.post("/empleados/confirmar-excel")
+async def confirmar_empleados_excel(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    if not archivo.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "El archivo debe ser Excel (.xlsx o .xls)")
+
+    sede_id = get_sede_activa(user)
+    contenido = await archivo.read()
+    validas, errores = _parsear_excel_empleados(contenido)
+
+    if not validas:
+        raise HTTPException(400, "No hay filas válidas para importar")
+
+    creados = 0
+    actualizados = 0
+
+    for fila in validas:
+        existente = db.query(Empleado).filter_by(sede_id=sede_id, codigo=fila["codigo"]).first()
+        if existente:
+            existente.nombre = fila["nombre"]
+            existente.cargo = fila["cargo"]
+            existente.activo = True
+            actualizados += 1
+        else:
+            db.add(Empleado(sede_id=sede_id, **fila))
+            creados += 1
 
     db.commit()
     return {"creados": creados, "actualizados": actualizados, "errores": errores}
