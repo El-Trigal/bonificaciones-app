@@ -548,6 +548,7 @@ function TabSemanas() {
 function TabMaestros() {
   const [subTab, setSubTab] = useState(0);
   const subTabs = ['Líderes', 'Productos / Áreas', 'Tipos de Bonificación'];
+  const singulares = ['Líder', 'Producto / Área', 'Tipo de Bonificación'];
   const endpoints = ['/catalogos/lideres', '/catalogos/productos-areas', '/catalogos/tipos-bonificacion'];
 
   return (
@@ -560,15 +561,17 @@ function TabMaestros() {
           </button>
         ))}
       </div>
-      <CrudSimple key={subTab} endpoint={endpoints[subTab]} label={subTabs[subTab]} />
+      <CrudSimple key={subTab} endpoint={endpoints[subTab]} label={subTabs[subTab]} singular={singulares[subTab]} />
     </div>
   );
 }
 
-function CrudSimple({ endpoint, label }) {
+function CrudSimple({ endpoint, label, singular }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [nuevo, setNuevo] = useState('');
+  const [modal, setModal] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [guardando, setGuardando] = useState(false);
   const [laboresPorLider, setLaboresPorLider] = useState({});
 
   const esLideres = endpoint === '/catalogos/lideres';
@@ -592,15 +595,19 @@ function CrudSimple({ endpoint, label }) {
 
   useEffect(() => { cargar(); }, [endpoint]);
 
-  const agregar = async () => {
-    if (!nuevo.trim()) return;
+  const abrirModal = () => { setNombre(''); setModal(true); };
+
+  const guardar = async () => {
+    if (!nombre.trim()) return;
+    setGuardando(true);
     try {
-      await api.post(endpoint, { nombre: nuevo.trim() });
-      setNuevo('');
+      await api.post(endpoint, { nombre: nombre.trim() });
+      setModal(false);
       cargar();
     } catch (e) {
-      console.error('[CrudSimple] error al agregar:', e.response?.status, e.response?.data, e);
-      alert(e.response?.data?.detail || 'Error');
+      alert(e.response?.data?.detail || 'Error al guardar');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -612,14 +619,10 @@ function CrudSimple({ endpoint, label }) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-4">
-        <input type="text" value={nuevo} onChange={e => setNuevo(e.target.value)}
-          placeholder={`Nuevo ${label.slice(0, -1).toLowerCase()}...`}
-          onKeyDown={e => e.key === 'Enter' && agregar()}
-          className="border rounded-lg px-3 py-2 text-sm flex-1" />
-        <button onClick={agregar}
+      <div className="flex justify-end mb-4">
+        <button onClick={abrirModal}
           className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
-          <Plus size={16} /> Agregar
+          <Plus size={16} /> Agregar {singular}
         </button>
       </div>
       {loading ? <LoadingSpinner /> : (
@@ -662,6 +665,30 @@ function CrudSimple({ endpoint, label }) {
           </tbody>
         </table>
       )}
+
+      <Modal isOpen={modal} onClose={() => setModal(false)} title={`Nuevo ${singular}`}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Nombre</label>
+            <input
+              type="text"
+              autoFocus
+              value={nombre}
+              onChange={e => setNombre(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && guardar()}
+              placeholder={`Nombre del ${singular.toLowerCase()}...`}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+          <button
+            onClick={guardar}
+            disabled={!nombre.trim() || guardando}
+            className="w-full py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-40 disabled:cursor-not-allowed">
+            <Save size={16} className="inline mr-2" />
+            {guardando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
