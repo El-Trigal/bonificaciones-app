@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -598,7 +598,10 @@ function CrudSimple({ endpoint, label }) {
       await api.post(endpoint, { nombre: nuevo.trim() });
       setNuevo('');
       cargar();
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    } catch (e) {
+      console.error('[CrudSimple] error al agregar:', e.response?.status, e.response?.data, e);
+      alert(e.response?.data?.detail || 'Error');
+    }
   };
 
   const desactivar = async (id) => {
