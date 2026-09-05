@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from database import get_db
 from models import (
-    Empleado, Lider, ProductoArea, Semana, LaborRendimiento, TipoBonificacion, Usuario
+    Empleado, Lider, ProductoArea, Semana, LaborRendimiento, TipoBonificacion, Usuario,
+    ConfigCurvaCalidad,
 )
 from schemas import (
     EmpleadoCreate, EmpleadoUpdate, EmpleadoOut,
@@ -17,7 +18,9 @@ from schemas import (
     SemanaCreate, SemanaUpdate, SemanaOut,
     LaborRendimientoCreate, LaborRendimientoUpdate, LaborRendimientoOut,
     TipoBonificacionCreate, TipoBonificacionOut,
+    CurvaCalidadOut, GuardarCurvaIn, GuardarCurvaBulkIn, ReglaCalidadOut,
 )
+from services.calculador import CURVA_CALIDAD_DEFAULT
 from services.auth import get_current_user, get_sede_activa, requiere_permiso
 
 router = APIRouter()
@@ -546,3 +549,174 @@ def desactivar_tipo(
     tipo.activo = False
     db.commit()
     return {"mensaje": f"Tipo '{tipo.nombre}' desactivado"}
+
+
+# ─── Curva de Calidad ─────────────────────────────────────
+
+def _reglas_a_out(rows: list, es_defecto: bool) -> list[dict]:
+    """Convierte filas ordenadas de ConfigCurvaCalidad en lista con pct_hasta calculado."""
+    resultado = []
+    for i, r in enumerate(rows):
+        hasta = rows[i + 1]["pct_calidad"] - 1 if i < len(rows) - 1 else 100
+        resultado.append({
+            "id": r.get("id"),
+            "pct_calidad": r["pct_calidad"],
+            "pct_hasta": hasta,
+            "multiplicador": r["multiplicador"],
+        })
+    return resultado
+
+
+def _cargar_reglas_labor(labor_id: int, sede_id: int, db: Session) -> tuple[list, bool]:
+    """Retorna (reglas_dict_list, es_defecto). Si no hay config, devuelve la curva por defecto."""
+    rows = (
+        db.query(ConfigCurvaCalidad)
+        .filter_by(labor_id=labor_id, sede_id=sede_id)
+        .order_by(ConfigCurvaCalidad.pct_calidad)
+        .all()
+    )
+    if rows:
+        return [{"id": r.id, "pct_calidad": r.pct_calidad, "multiplicador": r.multiplicador} for r in rows], False
+    return [dict(r) for r in CURVA_CALIDAD_DEFAULT], True
+
+
+def _validar_reglas(reglas: list) -> str | None:
+    """Retorna mensaje de error o None si las reglas son válidas."""
+    if not reglas:
+        return "Debe haber al menos un tramo"
+    sorted_r = sorted(reglas, key=lambda r: r.pct_calidad)
+    if sorted_r[0].pct_calidad != 0:
+        return "El primer tramo debe comenzar en 0%"
+    vistos = set()
+    for r in sorted_r:
+        if r.pct_calidad in vistos:
+            return f"Hay puntos de calidad duplicados ({r.pct_calidad}%)"
+        vistos.add(r.pct_calidad)
+    return None
+
+
+@router.get("/curva-calidad", response_model=List[CurvaCalidadOut])
+def listar_labores_curva(
+    buscar: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    q = db.query(LaborRendimiento).filter_by(sede_id=sede_id, activo=True)
+    if buscar:
+        q = q.filter(LaborRendimiento.nombre.ilike(f"%{buscar}%"))
+    labores = q.order_by(LaborRendimiento.nombre).all()
+
+    ids_con_config = {
+        r.labor_id
+        for r in db.query(ConfigCurvaCalidad.labor_id)
+        .filter_by(sede_id=sede_id)
+        .distinct()
+        .all()
+    }
+
+    resultado = []
+    for labor in labores:
+        reglas_raw, es_defecto = _cargar_reglas_labor(labor.id, sede_id, db)
+        resultado.append(CurvaCalidadOut(
+            labor_id=labor.id,
+            labor_nombre=labor.nombre,
+            lider_nombre=labor.lider_nombre,
+            es_defecto=labor.id not in ids_con_config,
+            reglas=_reglas_a_out(reglas_raw, es_defecto),
+        ))
+    return resultado
+
+
+# IMPORTANTE: /bulk debe ir ANTES de /{labor_id} para que FastAPI no lo trate como ID
+@router.put("/curva-calidad/bulk")
+def guardar_curva_bulk(
+    data: GuardarCurvaBulkIn,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    error = _validar_reglas(data.reglas)
+    if error:
+        raise HTTPException(400, error)
+
+    for labor_id in data.labor_ids:
+        labor = db.query(LaborRendimiento).filter_by(id=labor_id, sede_id=sede_id).first()
+        if not labor:
+            raise HTTPException(404, f"Labor {labor_id} no encontrada")
+        db.query(ConfigCurvaCalidad).filter_by(labor_id=labor_id, sede_id=sede_id).delete()
+        for r in data.reglas:
+            db.add(ConfigCurvaCalidad(
+                sede_id=sede_id, labor_id=labor_id,
+                pct_calidad=r.pct_calidad, multiplicador=r.multiplicador,
+            ))
+    db.commit()
+    return {"mensaje": f"Curva actualizada para {len(data.labor_ids)} labores"}
+
+
+@router.get("/curva-calidad/{labor_id}", response_model=CurvaCalidadOut)
+def obtener_curva_labor(
+    labor_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    labor = db.query(LaborRendimiento).filter_by(id=labor_id, sede_id=sede_id).first()
+    if not labor:
+        raise HTTPException(404, "Labor no encontrada")
+    reglas_raw, es_defecto = _cargar_reglas_labor(labor_id, sede_id, db)
+    return CurvaCalidadOut(
+        labor_id=labor.id,
+        labor_nombre=labor.nombre,
+        lider_nombre=labor.lider_nombre,
+        es_defecto=es_defecto,
+        reglas=_reglas_a_out(reglas_raw, es_defecto),
+    )
+
+
+@router.put("/curva-calidad/{labor_id}", response_model=CurvaCalidadOut)
+def guardar_curva_labor(
+    labor_id: int,
+    data: GuardarCurvaIn,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    labor = db.query(LaborRendimiento).filter_by(id=labor_id, sede_id=sede_id).first()
+    if not labor:
+        raise HTTPException(404, "Labor no encontrada")
+    error = _validar_reglas(data.reglas)
+    if error:
+        raise HTTPException(400, error)
+
+    db.query(ConfigCurvaCalidad).filter_by(labor_id=labor_id, sede_id=sede_id).delete()
+    for r in data.reglas:
+        db.add(ConfigCurvaCalidad(
+            sede_id=sede_id, labor_id=labor_id,
+            pct_calidad=r.pct_calidad, multiplicador=r.multiplicador,
+        ))
+    db.commit()
+
+    reglas_raw, es_defecto = _cargar_reglas_labor(labor_id, sede_id, db)
+    return CurvaCalidadOut(
+        labor_id=labor.id,
+        labor_nombre=labor.nombre,
+        lider_nombre=labor.lider_nombre,
+        es_defecto=es_defecto,
+        reglas=_reglas_a_out(reglas_raw, es_defecto),
+    )
+
+
+@router.delete("/curva-calidad/{labor_id}")
+def restaurar_curva_defecto(
+    labor_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    labor = db.query(LaborRendimiento).filter_by(id=labor_id, sede_id=sede_id).first()
+    if not labor:
+        raise HTTPException(404, "Labor no encontrada")
+    eliminadas = db.query(ConfigCurvaCalidad).filter_by(labor_id=labor_id, sede_id=sede_id).delete()
+    db.commit()
+    return {"mensaje": f"Curva de '{labor.nombre}' restaurada al valor por defecto", "eliminadas": eliminadas}

@@ -114,6 +114,33 @@ class LaborRendimientoOut(LaborRendimientoBase):
     model_config = {"from_attributes": True}
 
 
+# ─── Curva de Calidad ───────────────────────────────────
+class ReglaCalidadIn(BaseModel):
+    pct_calidad: int = Field(..., ge=0, le=100)
+    multiplicador: float = Field(..., ge=0.0, le=1.0)
+
+class ReglaCalidadOut(BaseModel):
+    id: Optional[int] = None
+    pct_calidad: int
+    pct_hasta: int
+    multiplicador: float
+    model_config = {"from_attributes": True}
+
+class CurvaCalidadOut(BaseModel):
+    labor_id: int
+    labor_nombre: str
+    lider_nombre: Optional[str] = None
+    es_defecto: bool
+    reglas: List[ReglaCalidadOut]
+
+class GuardarCurvaIn(BaseModel):
+    reglas: List[ReglaCalidadIn]
+
+class GuardarCurvaBulkIn(BaseModel):
+    labor_ids: List[int]
+    reglas: List[ReglaCalidadIn]
+
+
 # ─── Tipos de Bonificación ──────────────────────────────
 class TipoBonificacionBase(BaseModel):
     nombre: str

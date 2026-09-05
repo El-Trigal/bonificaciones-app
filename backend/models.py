@@ -496,6 +496,22 @@ class AjusteRetroactivo(Base):
     aprobado_en = Column(DateTime, nullable=True)
 
 
+class ConfigCurvaCalidad(Base):
+    """Breakpoints de la curva calidad→bonificación por labor.
+    Lookup: mayor pct_calidad (entero 0-100) que sea <= calidad real del colaborador."""
+    __tablename__ = "config_curva_calidad"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sede_id = Column(Integer, ForeignKey("sedes.id"), nullable=False, index=True)
+    labor_id = Column(Integer, ForeignKey("labores_rendimiento.id"), nullable=False, index=True)
+    pct_calidad = Column(Integer, nullable=False)   # 0–100 entero, punto de quiebre
+    multiplicador = Column(Float, nullable=False)    # 0.0–1.0
+
+    __table_args__ = (
+        UniqueConstraint("sede_id", "labor_id", "pct_calidad", name="uq_curva_labor_pct"),
+    )
+
+
 class Usuario(Base):
     """Usuarios del sistema con roles y sede asignada."""
     __tablename__ = "usuarios"

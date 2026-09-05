@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ExcelUploadModal from '../components/shared/ExcelUploadModal';
-import { Plus, Upload, Pencil, Trash2, Save, X } from 'lucide-react';
+import { Plus, Upload, Pencil, Trash2, Save, X, Settings2, RotateCcw } from 'lucide-react';
 
-const tabs = ['Empleados', 'Labores de Rendimiento', 'Semanas', 'Maestros Generales'];
+const tabs = ['Empleados', 'Labores de Rendimiento', 'Semanas', 'Maestros Generales', 'Curva de Calidad'];
 
 export default function Catalogos() {
   const [activeTab, setActiveTab] = useState(0);
@@ -13,7 +13,7 @@ export default function Catalogos() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Catálogos</h1>
-      <div className="flex gap-1 border-b mb-6">
+      <div className="flex gap-1 border-b mb-6 flex-wrap">
         {tabs.map((t, i) => (
           <button key={t} onClick={() => setActiveTab(i)}
             className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
@@ -25,6 +25,7 @@ export default function Catalogos() {
       {activeTab === 1 && <TabLabores />}
       {activeTab === 2 && <TabSemanas />}
       {activeTab === 3 && <TabMaestros />}
+      {activeTab === 4 && <TabCurvaCalidad />}
     </div>
   );
 }
@@ -599,6 +600,365 @@ function CrudSimple({ endpoint, label }) {
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+// ─── Tab Curva de Calidad ───────────────────────────────
+function TabCurvaCalidad() {
+  const [labores, setLabores] = useState([]);
+  const [buscar, setBuscar] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [modal, setModal] = useState(null); // null | { laborIds, labores }
+
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/catalogos/curva-calidad', {
+        params: { buscar: buscar || undefined },
+      });
+      setLabores(data);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, [buscar]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const toggleTodos = (e) => {
+    if (e.target.checked) setSeleccionados(new Set(labores.map((l) => l.labor_id)));
+    else setSeleccionados(new Set());
+  };
+
+  const toggleUno = (id) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const abrirUna = (labor) => {
+    setModal({ laborIds: [labor.labor_id], labores: [{ id: labor.labor_id, nombre: labor.labor_nombre }] });
+  };
+
+  const abrirBulk = () => {
+    const sel = labores.filter((l) => seleccionados.has(l.labor_id));
+    setModal({ laborIds: sel.map((l) => l.labor_id), labores: sel.map((l) => ({ id: l.labor_id, nombre: l.labor_nombre })) });
+  };
+
+  const restaurar = async (labor) => {
+    if (!confirm(`¿Restaurar la curva de "${labor.labor_nombre}" a los valores por defecto?`)) return;
+    try {
+      await api.delete(`/catalogos/curva-calidad/${labor.labor_id}`);
+      cargar();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border">
+      {/* Barra superior */}
+      <div className="flex items-center gap-3 p-4 border-b">
+        <input
+          type="text" placeholder="Buscar labor..." value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm w-72"
+        />
+        <span className="text-sm text-gray-500 ml-auto">
+          {labores.length} labores
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="p-8 flex justify-center"><LoadingSpinner /></div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox"
+                    checked={seleccionados.size === labores.length && labores.length > 0}
+                    onChange={toggleTodos}
+                    className="rounded"
+                  />
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Labor</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Líder</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Tramos</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Config</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {labores.map((labor) => (
+                <tr key={labor.labor_id} className={`hover:bg-gray-50 ${seleccionados.has(labor.labor_id) ? 'bg-primary-50' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input type="checkbox"
+                      checked={seleccionados.has(labor.labor_id)}
+                      onChange={() => toggleUno(labor.labor_id)}
+                      className="rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-gray-800">{labor.labor_nombre}</td>
+                  <td className="px-4 py-3 text-gray-500">{labor.lider_nombre || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{labor.reglas.length} tramos</td>
+                  <td className="px-4 py-3">
+                    {labor.es_defecto ? (
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Por defecto</span>
+                    ) : (
+                      <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">Personalizada</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 justify-end">
+                      {!labor.es_defecto && (
+                        <button
+                          onClick={() => restaurar(labor)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 transition-colors"
+                          title="Restaurar a defecto"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => abrirUna(labor)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                      >
+                        <Settings2 size={13} /> Configurar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Barra de acción masiva */}
+      {seleccionados.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl shadow-2xl px-5 py-3 flex items-center gap-4">
+          <span className="text-sm font-medium">{seleccionados.size} labor{seleccionados.size > 1 ? 'es' : ''} seleccionada{seleccionados.size > 1 ? 's' : ''}</span>
+          <button
+            onClick={abrirBulk}
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-400 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Settings2 size={14} /> Editar % bonificación
+          </button>
+          <button onClick={() => setSeleccionados(new Set())} className="text-gray-400 hover:text-white p-1">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {modal && (
+        <CurvaCalidadModal
+          laborIds={modal.laborIds}
+          labores={modal.labores}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); setSeleccionados(new Set()); cargar(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal de edición de curva ──────────────────────────
+function CurvaCalidadModal({ laborIds, labores, onClose, onSaved }) {
+  const [reglas, setReglas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const esBulk = laborIds.length > 1;
+
+  useEffect(() => {
+    api.get(`/catalogos/curva-calidad/${laborIds[0]}`).then(({ data }) => {
+      setReglas(data.reglas.map((r) => ({ ...r, _key: Math.random() })));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const actualizarMultiplicador = (key, valor) => {
+    setReglas((prev) =>
+      prev.map((r) => r._key === key ? { ...r, multiplicador: valor } : r)
+    );
+  };
+
+  const actualizarDesde = (key, valor) => {
+    setReglas((prev) =>
+      prev.map((r) => r._key === key ? { ...r, pct_calidad: valor } : r)
+    );
+  };
+
+  const eliminarFila = (key) => {
+    setReglas((prev) => prev.filter((r) => r._key !== key));
+  };
+
+  const agregarFila = () => {
+    const sorted = [...reglas].sort((a, b) => a.pct_calidad - b.pct_calidad);
+    const ultimo = sorted[sorted.length - 1];
+    const nuevoDesde = ultimo ? Math.min(ultimo.pct_calidad + 1, 100) : 0;
+    setReglas((prev) => [...prev, { pct_calidad: nuevoDesde, multiplicador: 1.0, pct_hasta: 100, _key: Math.random() }]);
+  };
+
+  // Calcular pct_hasta en tiempo real
+  const reglasConHasta = () => {
+    const sorted = [...reglas].sort((a, b) => a.pct_calidad - b.pct_calidad);
+    return sorted.map((r, i) => ({
+      ...r,
+      pct_hasta: i < sorted.length - 1 ? sorted[i + 1].pct_calidad - 1 : 100,
+    }));
+  };
+
+  const guardar = async () => {
+    setError('');
+    const sorted = [...reglas].sort((a, b) => a.pct_calidad - b.pct_calidad);
+    if (!sorted.length) { setError('Debe haber al menos un tramo'); return; }
+    if (sorted[0].pct_calidad !== 0) { setError('El primer tramo debe comenzar en 0%'); return; }
+    const pcts = sorted.map((r) => r.pct_calidad);
+    if (new Set(pcts).size !== pcts.length) { setError('Hay puntos de calidad duplicados'); return; }
+
+    const payload = sorted.map((r) => ({
+      pct_calidad: parseInt(r.pct_calidad),
+      multiplicador: parseFloat(r.multiplicador),
+    }));
+
+    setSaving(true);
+    try {
+      if (esBulk) {
+        await api.put('/catalogos/curva-calidad/bulk', { labor_ids: laborIds, reglas: payload });
+      } else {
+        await api.put(`/catalogos/curva-calidad/${laborIds[0]}`, { reglas: payload });
+      }
+      onSaved();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Error al guardar');
+      setSaving(false);
+    }
+  };
+
+  const filas = reglasConHasta();
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col mx-4">
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">
+              {esBulk ? `Curva de calidad — ${labores.length} labores` : `Curva de calidad — ${labores[0]?.nombre}`}
+            </h2>
+            {esBulk && (
+              <p className="text-xs text-gray-500 mt-1">
+                Se aplicará a: {labores.map((l) => l.nombre).join(', ')}
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Calidad desde — hasta → % de bonificación aplicado. Primer tramo siempre desde 0%.
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 ml-4"><X size={18} /></button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5">
+          {loading ? (
+            <div className="flex justify-center py-8"><LoadingSpinner /></div>
+          ) : (
+            <>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Desde %</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Hasta %</th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">% Bonificación</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filas.map((r, i) => (
+                    <tr key={r._key} className="group hover:bg-gray-50">
+                      <td className="py-2 pr-4">
+                        <input
+                          type="number" min="0" max="100" step="1"
+                          value={r.pct_calidad}
+                          onChange={(e) => actualizarDesde(r._key, parseInt(e.target.value) || 0)}
+                          disabled={i === 0}
+                          className="w-20 border rounded px-2 py-1 text-sm text-center disabled:bg-gray-50 disabled:text-gray-400 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span className="text-gray-500 font-mono text-sm">{r.pct_hasta}%</span>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="0" max="100" step="1"
+                            value={Math.round(r.multiplicador * 100)}
+                            onChange={(e) => actualizarMultiplicador(r._key, (parseInt(e.target.value) || 0) / 100)}
+                            className="w-20 border rounded px-2 py-1 text-sm text-center focus:ring-1 focus:ring-primary-500 focus:outline-none"
+                          />
+                          <span className="text-gray-400 text-xs">%</span>
+                          {/* Mini barra visual */}
+                          <div className="flex-1 bg-gray-100 rounded-full h-1.5 max-w-[80px]">
+                            <div
+                              className="h-1.5 rounded-full bg-primary-500 transition-all"
+                              style={{ width: `${Math.round(r.multiplicador * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2">
+                        {filas.length > 1 && (
+                          <button
+                            onClick={() => eliminarFila(r._key)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded transition-all"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <button
+                onClick={agregarFila}
+                className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-800 font-medium"
+              >
+                <Plus size={15} /> Agregar tramo
+              </button>
+
+              {error && (
+                <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {error}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-4 border-t bg-gray-50 rounded-b-xl">
+          <span className="text-xs text-gray-400">{filas.length} tramos configurados</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={guardar}
+              disabled={saving || loading}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Guardando...' : <><Save size={14} /> Guardar cambios</>}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

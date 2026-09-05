@@ -5,23 +5,51 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models import (
     RegistroRendimiento, RegistroLaborEspecifica, LaborRendimiento,
-    Semana, Liquidacion, PasoCalculo
+    Semana, Liquidacion, PasoCalculo, ConfigCurvaCalidad
 )
 
 
-def obtener_multiplicador_calidad(pct_calidad: float) -> float:
+CURVA_CALIDAD_DEFAULT = [
+    {"pct_calidad": 0,  "multiplicador": 0.00},
+    {"pct_calidad": 81, "multiplicador": 0.10},
+    {"pct_calidad": 82, "multiplicador": 0.20},
+    {"pct_calidad": 83, "multiplicador": 0.30},
+    {"pct_calidad": 84, "multiplicador": 0.40},
+    {"pct_calidad": 85, "multiplicador": 0.50},
+    {"pct_calidad": 86, "multiplicador": 0.60},
+    {"pct_calidad": 87, "multiplicador": 0.70},
+    {"pct_calidad": 88, "multiplicador": 0.80},
+    {"pct_calidad": 89, "multiplicador": 0.90},
+    {"pct_calidad": 90, "multiplicador": 1.00},
+]
+
+
+def obtener_multiplicador_calidad(pct_calidad: float, reglas: list = None) -> float:
     """
-    Curva de calidad universal — replica la tabla del Excel.
-    < 0.81 → 0.0 (sin bonificación)
-    0.81-0.89 → escala lineal 0.10 a 0.90
-    >= 0.90 → 1.0
+    Curva de calidad. Si se pasan reglas (lista de dicts con pct_calidad y
+    multiplicador), usa lookup por breakpoints. Sin reglas usa la fórmula
+    original (retrocompatible).
     """
-    if pct_calidad is None or pct_calidad < 0.81:
+    if pct_calidad is None:
         return 0.0
-    elif pct_calidad >= 0.90:
-        return 1.0
-    else:
-        return round((pct_calidad - 0.80) * 10, 1)
+
+    if not reglas:
+        # Fórmula original hardcodeada
+        if pct_calidad < 0.81:
+            return 0.0
+        elif pct_calidad >= 0.90:
+            return 1.0
+        else:
+            return round((pct_calidad - 0.80) * 10, 1)
+
+    pct_int = round(pct_calidad * 100)
+    resultado = 0.0
+    for r in sorted(reglas, key=lambda x: x["pct_calidad"]):
+        if r["pct_calidad"] <= pct_int:
+            resultado = r["multiplicador"]
+        else:
+            break
+    return resultado
 
 
 def verificar_minimo_horas(semana: str, total_hs_ordinarias_semana: float, db: Session):
@@ -39,7 +67,7 @@ def verificar_minimo_horas(semana: str, total_hs_ordinarias_semana: float, db: S
     return cumple, total_hs_ordinarias_semana, horas_requeridas, horas_configuradas
 
 
-def calcular_bonif_rendimiento(registro: RegistroRendimiento, labor: LaborRendimiento, db: Session) -> dict:
+def calcular_bonif_rendimiento(registro: RegistroRendimiento, labor: LaborRendimiento, db: Session, reglas_calidad: list = None) -> dict:
     """
     Cálculo completo de bonificación por rendimiento.
     Retorna dict con todos los valores intermedios para trazabilidad.
@@ -68,7 +96,7 @@ def calcular_bonif_rendimiento(registro: RegistroRendimiento, labor: LaborRendim
     )
 
     # Paso 3: Multiplicador de calidad
-    mult_calidad = obtener_multiplicador_calidad(registro.pct_calidad)
+    mult_calidad = obtener_multiplicador_calidad(registro.pct_calidad, reglas_calidad)
     cumple_calidad = mult_calidad > 0
 
     # Paso 4: Unidades
@@ -589,7 +617,14 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
                     )
                     continue
 
-                resultado = calcular_bonif_rendimiento(reg, labor, db)
+                reglas_q = db.query(ConfigCurvaCalidad).filter_by(labor_id=labor.id)
+                if sede_id:
+                    reglas_q = reglas_q.filter_by(sede_id=sede_id)
+                reglas_rows = reglas_q.order_by(ConfigCurvaCalidad.pct_calidad).all()
+                reglas = ([{"pct_calidad": r.pct_calidad, "multiplicador": r.multiplicador} for r in reglas_rows]
+                          if reglas_rows else None)
+
+                resultado = calcular_bonif_rendimiento(reg, labor, db, reglas_calidad=reglas)
                 guardar_liquidacion_y_pasos(
                     resultado, db,
                     registro_rendimiento_id=reg.id,
