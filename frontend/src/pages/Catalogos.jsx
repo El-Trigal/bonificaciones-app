@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ExcelUploadModal from '../components/shared/ExcelUploadModal';
-import { Plus, Upload, Pencil, Trash2, Save, X, Settings2, RotateCcw } from 'lucide-react';
+import { Plus, Upload, Pencil, Trash2, Save, X, Settings2 } from 'lucide-react';
 
-const tabs = ['Empleados', 'Labores de Rendimiento', 'Semanas', 'Maestros Generales', 'Curva de Calidad'];
+const tabs = ['Empleados', 'Labores', 'Semanas', 'Maestros Generales'];
 
 export default function Catalogos() {
   const [activeTab, setActiveTab] = useState(0);
@@ -25,7 +25,6 @@ export default function Catalogos() {
       {activeTab === 1 && <TabLabores />}
       {activeTab === 2 && <TabSemanas />}
       {activeTab === 3 && <TabMaestros />}
-      {activeTab === 4 && <TabCurvaCalidad />}
     </div>
   );
 }
@@ -166,7 +165,7 @@ function TabEmpleados() {
   );
 }
 
-// ─── Tab Labores de Rendimiento ────────────────────────
+// ─── Tab Labores ────────────────────────────────────────
 function TabLabores() {
   const [labores, setLabores] = useState([]);
   const [lideres, setLideres] = useState([]);
@@ -174,6 +173,8 @@ function TabLabores() {
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
   const [recomputando, setRecomputando] = useState(false);
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [curvaModal, setCurvaModal] = useState(null);
 
   const defaults = {
     nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1,
@@ -209,7 +210,6 @@ function TabLabores() {
     }
   }
 
-  // Calcular valores derivados en tiempo real
   const calcularDerivados = (f) => {
     const sb = parseFloat(f.salario_base) || 0;
     const smp = parseFloat(f.semanas_mes_promedio) || 4.33;
@@ -248,13 +248,36 @@ function TabLabores() {
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
+  const toggleTodos = (e) => {
+    if (e.target.checked) setSeleccionados(new Set(labores.map(l => l.id)));
+    else setSeleccionados(new Set());
+  };
+
+  const toggleUno = (id) => {
+    setSeleccionados(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const abrirCurvaUna = (labor) => {
+    setCurvaModal({ laborIds: [labor.id], labores: [{ id: labor.id, nombre: labor.nombre }] });
+  };
+
+  const abrirCurvaBulk = () => {
+    const sel = labores.filter(l => seleccionados.has(l.id));
+    setCurvaModal({ laborIds: sel.map(l => l.id), labores: sel.map(l => ({ id: l.id, nombre: l.nombre })) });
+  };
+
   const derivados = form.rendimiento_min_hora ? calcularDerivados(form) : null;
   const fmt = (v) => '$' + Math.round(v || 0).toLocaleString('es-CO');
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex justify-between mb-4">
-        <h3 className="font-semibold text-gray-700">Labores de Rendimiento</h3>
+        <h3 className="font-semibold text-gray-700">Labores</h3>
         <div className="flex gap-2">
           <button onClick={recomputarLideres} disabled={recomputando}
             className="flex items-center gap-2 px-3 py-2 bg-white border border-primary-700 text-primary-700 rounded-lg text-sm hover:bg-primary-50 disabled:opacity-50">
@@ -272,6 +295,11 @@ function TabLabores() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
+                <th className="w-10 px-2 py-2">
+                  <input type="checkbox"
+                    checked={seleccionados.size === labores.length && labores.length > 0}
+                    onChange={toggleTodos} className="rounded" />
+                </th>
                 <th className="text-left p-2">Labor</th>
                 <th className="text-left p-2">Líder</th>
                 <th className="text-right p-2">Rend. Mín/h</th>
@@ -285,7 +313,11 @@ function TabLabores() {
             </thead>
             <tbody>
               {labores.map(l => (
-                <tr key={l.id} className="border-b hover:bg-gray-50">
+                <tr key={l.id} className={`border-b hover:bg-gray-50 ${seleccionados.has(l.id) ? 'bg-primary-50' : ''}`}>
+                  <td className="px-2 py-2">
+                    <input type="checkbox" checked={seleccionados.has(l.id)}
+                      onChange={() => toggleUno(l.id)} className="rounded" />
+                  </td>
                   <td className="p-2 font-medium">{l.nombre}</td>
                   <td className="p-2 text-gray-700">{l.lider_nombre || <span className="text-gray-400 italic">—</span>}</td>
                   <td className="p-2 text-right">{l.rendimiento_min_hora}</td>
@@ -299,13 +331,31 @@ function TabLabores() {
                     </span>
                   </td>
                   <td className="p-2">
-                    <button onClick={() => { setForm(l); setModal(l); }}
-                      className="p-1 hover:bg-gray-100 rounded"><Pencil size={15} /></button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => { setForm(l); setModal(l); }}
+                        className="p-1 hover:bg-gray-100 rounded" title="Editar parámetros"><Pencil size={15} /></button>
+                      <button onClick={() => abrirCurvaUna(l)}
+                        className="p-1 hover:bg-primary-50 rounded text-primary-600" title="Configurar curva de calidad"><Settings2 size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Barra de acción masiva */}
+      {seleccionados.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl shadow-2xl px-5 py-3 flex items-center gap-4">
+          <span className="text-sm font-medium">{seleccionados.size} labor{seleccionados.size > 1 ? 'es' : ''} seleccionada{seleccionados.size > 1 ? 's' : ''}</span>
+          <button onClick={abrirCurvaBulk}
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-400 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+            <Settings2 size={14} /> Editar curva de calidad
+          </button>
+          <button onClick={() => setSeleccionados(new Set())} className="text-gray-400 hover:text-white p-1">
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -362,6 +412,15 @@ function TabLabores() {
           <Save size={16} className="inline mr-2" />Guardar
         </button>
       </Modal>
+
+      {curvaModal && (
+        <CurvaCalidadModal
+          laborIds={curvaModal.laborIds}
+          labores={curvaModal.labores}
+          onClose={() => setCurvaModal(null)}
+          onSaved={() => { setCurvaModal(null); setSeleccionados(new Set()); }}
+        />
+      )}
     </div>
   );
 }
@@ -599,167 +658,6 @@ function CrudSimple({ endpoint, label }) {
             ))}
           </tbody>
         </table>
-      )}
-    </div>
-  );
-}
-
-// ─── Tab Curva de Calidad ───────────────────────────────
-function TabCurvaCalidad() {
-  const [labores, setLabores] = useState([]);
-  const [buscar, setBuscar] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [seleccionados, setSeleccionados] = useState(new Set());
-  const [modal, setModal] = useState(null); // null | { laborIds, labores }
-
-  const cargar = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get('/catalogos/curva-calidad', {
-        params: { buscar: buscar || undefined },
-      });
-      setLabores(data);
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  }, [buscar]);
-
-  useEffect(() => { cargar(); }, [cargar]);
-
-  const toggleTodos = (e) => {
-    if (e.target.checked) setSeleccionados(new Set(labores.map((l) => l.labor_id)));
-    else setSeleccionados(new Set());
-  };
-
-  const toggleUno = (id) => {
-    setSeleccionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const abrirUna = (labor) => {
-    setModal({ laborIds: [labor.labor_id], labores: [{ id: labor.labor_id, nombre: labor.labor_nombre }] });
-  };
-
-  const abrirBulk = () => {
-    const sel = labores.filter((l) => seleccionados.has(l.labor_id));
-    setModal({ laborIds: sel.map((l) => l.labor_id), labores: sel.map((l) => ({ id: l.labor_id, nombre: l.labor_nombre })) });
-  };
-
-  const restaurar = async (labor) => {
-    if (!confirm(`¿Restaurar la curva de "${labor.labor_nombre}" a los valores por defecto?`)) return;
-    try {
-      await api.delete(`/catalogos/curva-calidad/${labor.labor_id}`);
-      cargar();
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border">
-      {/* Barra superior */}
-      <div className="flex items-center gap-3 p-4 border-b">
-        <input
-          type="text" placeholder="Buscar labor..." value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm w-72"
-        />
-        <span className="text-sm text-gray-500 ml-auto">
-          {labores.length} labores
-        </span>
-      </div>
-
-      {loading ? (
-        <div className="p-8 flex justify-center"><LoadingSpinner /></div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="w-10 px-4 py-3">
-                  <input type="checkbox"
-                    checked={seleccionados.size === labores.length && labores.length > 0}
-                    onChange={toggleTodos}
-                    className="rounded"
-                  />
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Labor</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Líder</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Tramos</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Config</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {labores.map((labor) => (
-                <tr key={labor.labor_id} className={`hover:bg-gray-50 ${seleccionados.has(labor.labor_id) ? 'bg-primary-50' : ''}`}>
-                  <td className="px-4 py-3">
-                    <input type="checkbox"
-                      checked={seleccionados.has(labor.labor_id)}
-                      onChange={() => toggleUno(labor.labor_id)}
-                      className="rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">{labor.labor_nombre}</td>
-                  <td className="px-4 py-3 text-gray-500">{labor.lider_nombre || '—'}</td>
-                  <td className="px-4 py-3 text-gray-500">{labor.reglas.length} tramos</td>
-                  <td className="px-4 py-3">
-                    {labor.es_defecto ? (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Por defecto</span>
-                    ) : (
-                      <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">Personalizada</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      {!labor.es_defecto && (
-                        <button
-                          onClick={() => restaurar(labor)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 transition-colors"
-                          title="Restaurar a defecto"
-                        >
-                          <RotateCcw size={14} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => abrirUna(labor)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                      >
-                        <Settings2 size={13} /> Configurar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Barra de acción masiva */}
-      {seleccionados.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl shadow-2xl px-5 py-3 flex items-center gap-4">
-          <span className="text-sm font-medium">{seleccionados.size} labor{seleccionados.size > 1 ? 'es' : ''} seleccionada{seleccionados.size > 1 ? 's' : ''}</span>
-          <button
-            onClick={abrirBulk}
-            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-400 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Settings2 size={14} /> Editar % bonificación
-          </button>
-          <button onClick={() => setSeleccionados(new Set())} className="text-gray-400 hover:text-white p-1">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {modal && (
-        <CurvaCalidadModal
-          laborIds={modal.laborIds}
-          labores={modal.labores}
-          onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); setSeleccionados(new Set()); cargar(); }}
-        />
       )}
     </div>
   );
