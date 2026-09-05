@@ -175,7 +175,11 @@ def _parsear_excel_empleados(contenido_bytes: bytes) -> tuple[list[dict], list[s
         raw_nombre = str(row[idx_nombre]).strip() if row[idx_nombre] is not None else ""
         raw_cargo = str(row[idx_cargo]).strip() if (idx_cargo is not None and row[idx_cargo] is not None) else ""
 
-        # Ignorar la columna ITEM (números de fila del Excel)
+        # Filas con ID y NOMBRE vacíos son artefactos de Excel (celdas con formato
+        # pero sin datos). Se omiten silenciosamente en lugar de reportarlas como error.
+        if not raw_id and not raw_nombre:
+            continue
+
         fila_errores = []
 
         # ID requerido y debe ser entero
@@ -194,7 +198,9 @@ def _parsear_excel_empleados(contenido_bytes: bytes) -> tuple[list[dict], list[s
             fila_errores.append("NOMBRE vacío")
 
         if fila_errores:
-            errores.append(f"Fila {fila_num}: {', '.join(fila_errores)}")
+            # Incluir el nombre en el error para identificar al colaborador
+            nombre_ref = f" ({raw_nombre})" if raw_nombre else ""
+            errores.append(f"Fila {fila_num}{nombre_ref}: {', '.join(fila_errores)}")
             continue
 
         validas.append({
