@@ -620,146 +620,357 @@ function TabLabores() {
 }
 
 // ─── Tab Semanas ───────────────────────────────────────
+// Días en orden: índice 0=Dom,1=Lun,2=Mar,3=Mié,4=Jue,5=Vie,6=Sáb
+const DIA_LABELS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const DIA_KEYS   = ['horas_dom','horas_lun','horas_mar','horas_mie','horas_jue','horas_vie','horas_sab'];
+const DIA_CONFIG = ['horas_dom_default','horas_lun_default','horas_mar_default','horas_mie_default','horas_jue_default','horas_vie_default','horas_sab_default'];
+
+function diasOrdenados(diaInicio) {
+  // diaInicio: 0=Dom, 1=Lun
+  // Devuelve los índices 0-6 reordenados según el día de inicio
+  const orden = [];
+  for (let i = 0; i < 7; i++) orden.push((diaInicio + i) % 7);
+  return orden;
+}
+
+function fechaDia(fechaInicio, diaIdx, diaInicioSemana) {
+  // Dado fecha_inicio (string YYYY-MM-DD) y un índice de día (0=Dom..6=Sáb),
+  // retorna el día del mes que corresponde a ese día de la semana en esa semana
+  if (!fechaInicio) return null;
+  const base = new Date(fechaInicio + 'T00:00:00');
+  // Ajustar si el inicio es domingo (base puede ser lunes o domingo según config)
+  const baseDia = (base.getDay()); // 0=Dom,1=Lun...
+  const offset = (diaIdx - baseDia + 7) % 7;
+  const d = new Date(base);
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+function mesLabel(semana) {
+  if (!semana.fecha_inicio || !semana.fecha_cierre) return '';
+  const ini = new Date(semana.fecha_inicio + 'T00:00:00');
+  const fin = new Date(semana.fecha_cierre + 'T00:00:00');
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  if (ini.getMonth() === fin.getMonth()) return meses[ini.getMonth()];
+  return `${meses[ini.getMonth()]}/${meses[fin.getMonth()]}`;
+}
+
 function TabSemanas() {
   const añoActual = new Date().getFullYear();
   const [año, setAño] = useState(añoActual);
   const [semanas, setSemanasData] = useState([]);
+  const [festivos, setFestivos] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
-  const [editando, setEditando] = useState(null);
-  const [editVal, setEditVal] = useState({});
+  const [config, setConfig] = useState({
+    dia_inicio_semana: 1,
+    horas_lun_default: 8.5, horas_mar_default: 7.25, horas_mie_default: 7.25,
+    horas_jue_default: 7.25, horas_vie_default: 7.25, horas_sab_default: 6.0,
+    horas_dom_default: 0.0,
+  });
+  const [configModal, setConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState({});
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [editModal, setEditModal] = useState(null); // semana obj
+  const [editForm, setEditForm] = useState({});
+  const [paginaOffset, setPaginaOffset] = useState(0);
+  const PAGE_SIZE = 10;
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/catalogos/semanas', { params: { año } });
-      setSemanasData(data);
+      const [{ data: sw }, { data: fest }, { data: cfg }] = await Promise.all([
+        api.get('/catalogos/semanas', { params: { año } }),
+        api.get('/catalogos/festivos', { params: { año } }),
+        api.get('/catalogos/config-semanas'),
+      ]);
+      setSemanasData(sw);
+      setFestivos(new Set(fest));
+      setConfig(cfg);
+      setPaginaOffset(0);
     } catch (e) { console.error(e); }
     setLoading(false);
   }, [año]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const guardarSemana = async (id) => {
+  const generarSemanas = async () => {
+    if (!confirm(`¿Generar semanas del año ${año}?\n\nSe usará la plantilla configurada (horas por día, festivos colombianos automáticos). Las semanas ya existentes no se modifican.`)) return;
+    setGenerando(true);
     try {
-      await api.put(`/catalogos/semanas/${id}`, editVal);
-      setEditando(null);
+      const { data } = await api.post('/catalogos/semanas/generar-ano', null, { params: { año } });
+      alert(`Semanas generadas: ${data.creadas}${data.omitidas ? `\nYa existían: ${data.omitidas}` : ''}`);
+      cargar();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Error al generar semanas');
+    } finally { setGenerando(false); }
+  };
+
+  const abrirConfig = () => { setConfigForm({ ...config }); setConfigModal(true); };
+
+  const guardarConfig = async () => {
+    setGuardandoConfig(true);
+    const propagar = semanas.length > 0 &&
+      confirm(`¿Aplicar esta plantilla a las ${semanas.filter(s => !s.modificacion_manual).length} semanas de ${año} sin modificación manual?`);
+    try {
+      await api.put('/catalogos/config-semanas', { ...configForm, propagar, año_propagar: propagar ? año : null });
+      setConfigModal(false);
+      cargar();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    finally { setGuardandoConfig(false); }
+  };
+
+  const abrirEditar = (s) => {
+    const form = {};
+    DIA_KEYS.forEach(k => { form[k] = s[k] ?? config[DIA_CONFIG[DIA_KEYS.indexOf(k)]] ?? 0; });
+    setEditForm(form);
+    setEditModal(s);
+  };
+
+  const guardarEdicion = async () => {
+    try {
+      await api.put(`/catalogos/semanas/${editModal.id}`, editForm);
+      setEditModal(null);
       cargar();
     } catch (e) { alert('Error al guardar'); }
   };
 
-  const generarSemanas = async () => {
-    if (!confirm(`¿Generar las semanas del año ${año}?\n\nSe crearán con 48 horas ordinarias por defecto. Podrás editar las semanas con festivos o horas distintas una por una después.`)) return;
-    setGenerando(true);
-    try {
-      const { data } = await api.post('/catalogos/semanas/generar-ano', null, { params: { año, horas_ordinarias: 48 } });
-      alert(`Semanas generadas: ${data.creadas}\nYa existían: ${data.omitidas}`);
-      cargar();
-    } catch (e) {
-      alert(e.response?.data?.detail || 'Error al generar semanas');
-    } finally {
-      setGenerando(false);
-    }
+  const resetManual = async (s) => {
+    if (!confirm(`¿Resetear la semana ${s.codigo} a los valores de la plantilla global?`)) return;
+    const plantilla = {};
+    DIA_KEYS.forEach((k, i) => { plantilla[k] = config[DIA_CONFIG[i]]; });
+    await api.put(`/catalogos/semanas/${s.id}`, { ...plantilla, modificacion_manual: false });
+    cargar();
   };
 
-  const festivas = semanas.filter(s => s.tiene_festivo).length;
+  const orden = diasOrdenados(config.dia_inicio_semana);
+  const paginadas = semanas.slice(paginaOffset, paginaOffset + PAGE_SIZE);
+  const totalPags = Math.ceil(semanas.length / PAGE_SIZE);
+  const pagActual = Math.floor(paginaOffset / PAGE_SIZE);
+
+  const totalConfig = DIA_KEYS.reduce((s, k, i) => s + (parseFloat(configForm[k] ?? config[DIA_CONFIG[i]]) || 0), 0);
+  const labConfig = [1,2,3,4,5].reduce((s, idx) => s + (parseFloat(configForm[DIA_KEYS[idx]] ?? config[DIA_CONFIG[idx]]) || 0), 0);
+  const finConfig = totalConfig - labConfig;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
-      <div className="flex items-start justify-between mb-4 gap-4">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-5 gap-4">
         <div>
-          <h3 className="font-semibold text-gray-700">Semanas laborales</h3>
-          <p className="text-xs text-gray-400 mt-1">
-            Las horas ordinarias por semana determinan el umbral mínimo del 83% exigido al colaborador para acceder a bonificación de rendimiento.
-          </p>
+          <h3 className="font-semibold text-gray-800 text-base">Gestión de Horas Laborales por Semana</h3>
+          <p className="text-xs text-gray-400 mt-1">Las horas ordinarias determinan el umbral del 83% para acceder a bonificación de rendimiento.</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <select value={año} onChange={e => setAño(parseInt(e.target.value))}
-            className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-300">
-            {[añoActual - 1, añoActual, añoActual + 1].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <button onClick={abrirConfig}
+            className="flex items-center gap-1.5 px-3 py-2 border border-primary-700 text-primary-700 rounded-lg text-sm hover:bg-primary-50">
+            <Settings2 size={14}/> Configuración
+          </button>
           <button onClick={generarSemanas} disabled={generando}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800 disabled:opacity-50">
-            <Plus size={15} /> {generando ? 'Generando...' : `Generar semanas ${año}`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800 disabled:opacity-50">
+            <Plus size={14}/> {generando ? 'Generando...' : `Generar ${año}`}
           </button>
         </div>
       </div>
 
-      {!loading && semanas.length > 0 && (
-        <div className="flex gap-4 mb-4 text-sm">
-          <span className="text-gray-500">{semanas.length} semanas</span>
-          {festivas > 0 && (
-            <span className="text-amber-600 font-medium">{festivas} con festivo</span>
-          )}
+      {/* Controles año + leyenda */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setAño(a => a - 1)} className="p-1 hover:bg-gray-100 rounded"><X size={14} className="rotate-45"/></button>
+          <div className="flex items-center gap-1">
+            {[añoActual - 1, añoActual, añoActual + 1].map(y => (
+              <button key={y} onClick={() => setAño(y)}
+                className={`px-3 py-1 rounded-lg text-sm font-medium ${y === año ? 'bg-primary-700 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>{y}</button>
+            ))}
+          </div>
+          <button onClick={() => setAño(a => a + 1)} className="p-1 hover:bg-gray-100 rounded"><Plus size={14}/></button>
         </div>
-      )}
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-400 inline-block"/>&nbsp;Día Festivo</span>
+          <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-400 inline-block"/>&nbsp;Modificación Manual</span>
+          <span className="text-gray-400">Inicio semana: <strong>{config.dia_inicio_semana === 0 ? 'Domingo' : 'Lunes'}</strong></span>
+        </div>
+      </div>
 
       {loading ? <LoadingSpinner /> : semanas.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-base mb-1">No hay semanas para el año {año}</p>
-          <p className="text-sm">Usa el botón "Generar semanas {año}" para crearlas automáticamente.</p>
+        <div className="text-center py-16 text-gray-400 border-2 border-dashed rounded-xl">
+          <p className="text-base mb-1 font-medium">No hay semanas para {año}</p>
+          <p className="text-sm">Primero configura la plantilla y luego genera las semanas.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Código</th>
-                <th className="text-left p-2">Fechas</th>
-                <th className="text-right p-2">Horas ord.</th>
-                <th className="text-center p-2">Festivo</th>
-                <th className="p-2 w-20">Acc.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {semanas.map(s => (
-                <tr key={s.id} className={`border-b hover:bg-gray-50 ${s.tiene_festivo ? 'bg-amber-50 hover:bg-amber-100' : ''}`}>
-                  <td className="p-2 font-mono font-medium">{s.codigo}</td>
-                  <td className="p-2 text-gray-500 text-xs">
-                    {s.fecha_inicio && s.fecha_cierre
-                      ? `${s.fecha_inicio} → ${s.fecha_cierre}`
-                      : <span className="italic text-gray-300">—</span>}
-                  </td>
-                  <td className="p-2 text-right">
-                    {editando === s.id ? (
-                      <input type="number" step="0.25" min="0" value={editVal.horas_ordinarias}
-                        onChange={e => setEditVal({...editVal, horas_ordinarias: parseFloat(e.target.value)})}
-                        className="w-20 border rounded px-2 py-1 text-right" autoFocus />
-                    ) : (
-                      <span className="font-mono">{s.horas_ordinarias}</span>
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {editando === s.id ? (
-                      <input type="checkbox" checked={editVal.tiene_festivo}
-                        onChange={e => setEditVal({...editVal, tiene_festivo: e.target.checked})}
-                        className="rounded" />
-                    ) : (
-                      s.tiene_festivo
-                        ? <span className="inline-block w-3 h-3 rounded-full bg-amber-400" title="Semana con festivo" />
-                        : null
-                    )}
-                  </td>
-                  <td className="p-2 text-center">
-                    {editando === s.id ? (
-                      <div className="flex gap-1 justify-center">
-                        <button onClick={() => guardarSemana(s.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Save size={14} /></button>
-                        <button onClick={() => setEditando(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X size={14} /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setEditando(s.id); setEditVal({ horas_ordinarias: s.horas_ordinarias, tiene_festivo: s.tiene_festivo }); }}
-                        className="p-1 hover:bg-gray-100 rounded" title="Editar">
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                  </td>
+        <>
+          {/* Grilla tipo calendario */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b-2 border-gray-200">
+                  <th className="text-left px-3 py-2 font-semibold text-gray-600 w-28">Semana</th>
+                  {orden.map(idx => (
+                    <th key={idx} className="text-center px-2 py-2 font-semibold text-gray-600 min-w-[80px]">
+                      {DIA_LABELS[idx]}
+                    </th>
+                  ))}
+                  <th className="text-right px-3 py-2 font-semibold text-gray-600 w-24">Horas Tot.</th>
+                  <th className="px-2 py-2 w-16"/>
                 </tr>
+              </thead>
+              <tbody>
+                {paginadas.map(s => {
+                  const festDias = s.festivos_dias ? JSON.parse(s.festivos_dias) : [];
+                  return (
+                    <tr key={s.id} className={`border-b hover:bg-gray-50 transition-colors ${s.modificacion_manual ? 'bg-green-50/40' : ''}`}>
+                      <td className="px-3 py-2">
+                        <div className="font-mono font-bold text-gray-800">{s.codigo}</div>
+                        <div className="text-xs text-gray-400">{mesLabel(s)}</div>
+                      </td>
+                      {orden.map(diaIdx => {
+                        const key = DIA_KEYS[diaIdx];
+                        const horas = s[key] ?? config[DIA_CONFIG[diaIdx]] ?? 0;
+                        const fecha = fechaDia(s.fecha_inicio, diaIdx, config.dia_inicio_semana);
+                        const esFestivo = fecha && festivos.has(fecha.toISOString().split('T')[0]);
+                        return (
+                          <td key={diaIdx} className={`px-2 py-2 text-center border-l border-gray-100 ${esFestivo ? 'bg-blue-50' : ''}`}>
+                            <div className={`font-bold text-sm ${esFestivo ? 'text-blue-600' : 'text-gray-800'}`}>
+                              {horas > 0 ? `${horas}h` : <span className="text-gray-300">0h</span>}
+                            </div>
+                            {fecha && <div className="text-xs text-gray-400">{fecha.getDate()}</div>}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-right">
+                        <span className="font-mono font-bold text-gray-800">{s.horas_ordinarias}h</span>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => abrirEditar(s)} className="p-1 hover:bg-gray-100 rounded" title="Editar semana">
+                            <Pencil size={13}/>
+                          </button>
+                          {s.modificacion_manual && (
+                            <button onClick={() => resetManual(s)} className="p-1 hover:bg-orange-50 rounded text-orange-400" title="Resetear a plantilla global">
+                              <X size={13}/>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {totalPags > 1 && (
+            <div className="flex items-center justify-between mt-4 text-sm">
+              <span className="text-gray-400">{semanas.length} semanas · página {pagActual + 1} de {totalPags}</span>
+              <div className="flex gap-2">
+                <button disabled={paginaOffset === 0} onClick={() => setPaginaOffset(p => Math.max(0, p - PAGE_SIZE))}
+                  className="px-3 py-1 border rounded-lg hover:bg-gray-50 disabled:opacity-40">← Ant.</button>
+                <button disabled={paginaOffset + PAGE_SIZE >= semanas.length} onClick={() => setPaginaOffset(p => p + PAGE_SIZE)}
+                  className="px-3 py-1 border rounded-lg hover:bg-gray-50 disabled:opacity-40">Sig. →</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal configuración global */}
+      <Modal isOpen={configModal} onClose={() => setConfigModal(false)} title="Configuración de Horas Laborales" size="lg">
+        <div className="space-y-5">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700">
+            Esta configuración se aplica como plantilla al generar o regenerar semanas.
+          </div>
+
+          {/* Inicio de semana */}
+          <div className="border rounded-xl p-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Inicio de semana</p>
+            <div className="flex gap-3">
+              {[{v:1,l:'Lunes'},{v:0,l:'Domingo'}].map(({v,l}) => (
+                <button key={v} onClick={() => setConfigForm(f => ({...f, dia_inicio_semana: v}))}
+                  className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${configForm.dia_inicio_semana === v ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  {l}
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+
+          {/* Horas por día */}
+          <div className="border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Horas por día</p>
+              <span className="text-xs text-gray-400">Laborales: <strong>{labConfig}h</strong> | Fin semana: <strong>{finConfig}h</strong></span>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {diasOrdenados(configForm.dia_inicio_semana ?? 1).map(diaIdx => {
+                const key = DIA_CONFIG[diaIdx];
+                return (
+                  <div key={diaIdx} className="text-center">
+                    <div className="text-xs font-semibold text-gray-500 mb-1.5">{DIA_LABELS[diaIdx]}</div>
+                    <input type="number" min="0" max="24" step="0.25"
+                      value={configForm[key] ?? ''}
+                      onChange={e => setConfigForm(f => ({...f, [key]: parseFloat(e.target.value) || 0}))}
+                      className="w-full border rounded-lg px-1 py-2 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary-300" />
+                  </div>
+                );
+              })}
+            </div>
+            {/* Resumen */}
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              {[['TOTAL', totalConfig], ['LABORALES', labConfig], ['FIN SEMANA', finConfig]].map(([l, v]) => (
+                <div key={l} className="border rounded-lg p-3 text-center">
+                  <div className="text-xs text-gray-400 mb-1">{l}</div>
+                  <div className="text-xl font-bold text-gray-800">{v}h</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => setConfigModal(false)} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={guardarConfig} disabled={guardandoConfig}
+              className="flex-1 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800 disabled:opacity-50">
+              {guardandoConfig ? 'Guardando...' : 'Guardar configuración'}
+            </button>
+          </div>
         </div>
+      </Modal>
+
+      {/* Modal edición por semana */}
+      {editModal && (
+        <Modal isOpen={!!editModal} onClose={() => setEditModal(null)} title={`Editar semana ${editModal.codigo}`} size="md">
+          <div className="space-y-4">
+            <p className="text-xs text-gray-400">
+              {editModal.fecha_inicio} → {editModal.fecha_cierre} · {mesLabel(editModal)}
+            </p>
+            <div className="grid grid-cols-7 gap-2">
+              {diasOrdenados(config.dia_inicio_semana).map(diaIdx => {
+                const key = DIA_KEYS[diaIdx];
+                const fecha = fechaDia(editModal.fecha_inicio, diaIdx, config.dia_inicio_semana);
+                const esFestivo = fecha && festivos.has(fecha.toISOString().split('T')[0]);
+                return (
+                  <div key={diaIdx} className={`text-center border rounded-lg p-2 ${esFestivo ? 'border-blue-300 bg-blue-50' : ''}`}>
+                    <div className="text-xs font-semibold text-gray-500 mb-0.5">{DIA_LABELS[diaIdx]}</div>
+                    {fecha && <div className="text-xs text-gray-400 mb-1">{fecha.getDate()}</div>}
+                    {esFestivo && <div className="text-xs text-blue-500 mb-1">Festivo</div>}
+                    <input type="number" min="0" max="24" step="0.25"
+                      value={editForm[key] ?? ''}
+                      onChange={e => setEditForm(f => ({...f, [key]: parseFloat(e.target.value) || 0}))}
+                      className="w-full border rounded px-1 py-1.5 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary-300" />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between text-sm font-semibold border-t pt-3">
+              <span className="text-gray-500">Total semana:</span>
+              <span className="text-primary-700 text-lg">{Object.values(editForm).reduce((a,b) => a + (parseFloat(b)||0), 0)}h</span>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setEditModal(null)} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={guardarEdicion} className="flex-1 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
+                <Save size={14} className="inline mr-1"/>Guardar
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -21,6 +21,15 @@ class Sede(Base):
     horas_mensuales_default = Column(Float, default=240)
     recargo_he_diurna_pct = Column(Float, default=25)
     recargo_dominical_pct = Column(Float, default=75)
+    # Config semanas
+    dia_inicio_semana = Column(Integer, default=1)  # 0=Domingo 1=Lunes
+    horas_lun_default = Column(Float, default=8.5)
+    horas_mar_default = Column(Float, default=7.25)
+    horas_mie_default = Column(Float, default=7.25)
+    horas_jue_default = Column(Float, default=7.25)
+    horas_vie_default = Column(Float, default=7.25)
+    horas_sab_default = Column(Float, default=6.0)
+    horas_dom_default = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     usuarios = relationship("Usuario", back_populates="sede")
@@ -83,6 +92,16 @@ class Semana(Base):
     fecha_inicio = Column(Date, nullable=True)
     fecha_cierre = Column(Date, nullable=True)
     periodo_nomina_id = Column(Integer, ForeignKey("periodos_nomina.id"), nullable=True)
+    # Desglose por día (nullable = usa valor global de la sede)
+    horas_lun = Column(Float, nullable=True)
+    horas_mar = Column(Float, nullable=True)
+    horas_mie = Column(Float, nullable=True)
+    horas_jue = Column(Float, nullable=True)
+    horas_vie = Column(Float, nullable=True)
+    horas_sab = Column(Float, nullable=True)
+    horas_dom = Column(Float, nullable=True)
+    festivos_dias = Column(Text, nullable=True)   # JSON list [0..6] 0=Dom..6=Sáb
+    modificacion_manual = Column(Boolean, default=False)
 
     periodo_nomina = relationship("PeriodoNomina", back_populates="semanas")
 

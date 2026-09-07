@@ -66,10 +66,53 @@ class SemanaCreate(SemanaBase):
 class SemanaUpdate(BaseModel):
     horas_ordinarias: Optional[float] = None
     tiene_festivo: Optional[bool] = None
+    horas_lun: Optional[float] = None
+    horas_mar: Optional[float] = None
+    horas_mie: Optional[float] = None
+    horas_jue: Optional[float] = None
+    horas_vie: Optional[float] = None
+    horas_sab: Optional[float] = None
+    horas_dom: Optional[float] = None
+    festivos_dias: Optional[str] = None
+    modificacion_manual: Optional[bool] = None
 
 class SemanaOut(SemanaBase):
     id: int
+    fecha_inicio: Optional[Any] = None
+    fecha_cierre: Optional[Any] = None
+    horas_lun: Optional[float] = None
+    horas_mar: Optional[float] = None
+    horas_mie: Optional[float] = None
+    horas_jue: Optional[float] = None
+    horas_vie: Optional[float] = None
+    horas_sab: Optional[float] = None
+    horas_dom: Optional[float] = None
+    festivos_dias: Optional[str] = None
+    modificacion_manual: bool = False
     model_config = {"from_attributes": True}
+
+
+class ConfigSemanasOut(BaseModel):
+    dia_inicio_semana: int
+    horas_lun_default: float
+    horas_mar_default: float
+    horas_mie_default: float
+    horas_jue_default: float
+    horas_vie_default: float
+    horas_sab_default: float
+    horas_dom_default: float
+
+class ConfigSemanasIn(BaseModel):
+    dia_inicio_semana: int = 1
+    horas_lun_default: float = 8.5
+    horas_mar_default: float = 7.25
+    horas_mie_default: float = 7.25
+    horas_jue_default: float = 7.25
+    horas_vie_default: float = 7.25
+    horas_sab_default: float = 6.0
+    horas_dom_default: float = 0.0
+    propagar: bool = False
+    año_propagar: Optional[int] = None
 
 
 # ─── Labores de Rendimiento ─────────────────────────────

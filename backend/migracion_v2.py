@@ -47,6 +47,22 @@ def migrar_sedes():
     agregar_columna_si_falta("sedes", "horas_mensuales_default", "REAL DEFAULT 240")
     agregar_columna_si_falta("sedes", "recargo_he_diurna_pct", "REAL DEFAULT 25")
     agregar_columna_si_falta("sedes", "recargo_dominical_pct", "REAL DEFAULT 75")
+    agregar_columna_si_falta("sedes", "dia_inicio_semana", "INTEGER DEFAULT 1")
+    agregar_columna_si_falta("sedes", "horas_lun_default", "REAL DEFAULT 8.5")
+    agregar_columna_si_falta("sedes", "horas_mar_default", "REAL DEFAULT 7.25")
+    agregar_columna_si_falta("sedes", "horas_mie_default", "REAL DEFAULT 7.25")
+    agregar_columna_si_falta("sedes", "horas_jue_default", "REAL DEFAULT 7.25")
+    agregar_columna_si_falta("sedes", "horas_vie_default", "REAL DEFAULT 7.25")
+    agregar_columna_si_falta("sedes", "horas_sab_default", "REAL DEFAULT 6.0")
+    agregar_columna_si_falta("sedes", "horas_dom_default", "REAL DEFAULT 0.0")
+
+
+def migrar_semanas_diarias():
+    print("[1c] Agregando columnas diarias a 'semanas'...")
+    for col in ["horas_lun", "horas_mar", "horas_mie", "horas_jue", "horas_vie", "horas_sab", "horas_dom"]:
+        agregar_columna_si_falta("semanas", col, "REAL")
+    agregar_columna_si_falta("semanas", "festivos_dias", "TEXT")
+    agregar_columna_si_falta("semanas", "modificacion_manual", "BOOLEAN DEFAULT 0")
 
 
 def migrar_semanas():

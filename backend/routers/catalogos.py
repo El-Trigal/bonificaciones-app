@@ -2,7 +2,9 @@
 
 import csv
 import io
+import json
 import openpyxl
+import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -21,11 +23,69 @@ from schemas import (
     CurvaCalidadOut, GuardarCurvaIn, GuardarCurvaBulkIn, ReglaCalidadOut,
     ConfigLaboresOut, ConfigLaboresIn,
     ConfigNominaOut, ConfigNominaIn,
+    ConfigSemanasOut, ConfigSemanasIn,
 )
 from services.calculador import CURVA_CALIDAD_DEFAULT
 from services.auth import get_current_user, get_sede_activa, requiere_permiso
 
 router = APIRouter()
+
+
+# ─── Festivos colombianos ──────────────────────────────────
+def _pascua(año: int) -> dt.date:
+    """Calcula la fecha de Pascua (Domingo de Resurrección) para el año dado."""
+    a = año % 19
+    b, c = divmod(año, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = (h + l - 7 * m + 114) % 31 + 1
+    return dt.date(año, mes, dia)
+
+
+def _siguiente_lunes(d: dt.date) -> dt.date:
+    """Retorna d si es lunes, sino el lunes siguiente (Ley Emiliani)."""
+    dias = (7 - d.weekday()) % 7
+    return d if dias == 0 else d + dt.timedelta(days=dias)
+
+
+def festivos_colombia(año: int) -> list[dt.date]:
+    """Retorna lista de festivos colombianos para el año dado."""
+    pascua = _pascua(año)
+    festivos = [
+        # Fijos
+        dt.date(año, 1, 1),
+        dt.date(año, 5, 1),
+        dt.date(año, 7, 20),
+        dt.date(año, 8, 7),
+        dt.date(año, 12, 8),
+        dt.date(año, 12, 25),
+        # Semana Santa (fijos relativos a Pascua)
+        pascua - dt.timedelta(days=3),   # Jueves Santo
+        pascua - dt.timedelta(days=2),   # Viernes Santo
+        # Ley Emiliani
+        _siguiente_lunes(dt.date(año, 1, 6)),
+        _siguiente_lunes(dt.date(año, 3, 19)),
+        _siguiente_lunes(dt.date(año, 6, 29)),
+        _siguiente_lunes(dt.date(año, 8, 15)),
+        _siguiente_lunes(dt.date(año, 10, 12)),
+        _siguiente_lunes(dt.date(año, 11, 1)),
+        _siguiente_lunes(dt.date(año, 11, 11)),
+        _siguiente_lunes(pascua + dt.timedelta(days=39)),   # Ascensión
+        _siguiente_lunes(pascua + dt.timedelta(days=60)),   # Corpus Christi
+        _siguiente_lunes(pascua + dt.timedelta(days=68)),   # Sagrado Corazón
+    ]
+    return sorted(set(festivos))
+
+
+def _dia_idx(fecha: dt.date) -> int:
+    """0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb"""
+    return (fecha.weekday() + 1) % 7
 
 
 # ─── Empleados ─────────────────────────────────────────────
@@ -474,38 +534,144 @@ def crear_semana(
     return semana
 
 
-@router.post("/semanas/generar-ano")
-def generar_semanas_ano(
-    año: int,
-    horas_ordinarias: float = 48.0,
+@router.get("/config-semanas", response_model=ConfigSemanasOut)
+def get_config_semanas(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    return ConfigSemanasOut(
+        dia_inicio_semana=sede.dia_inicio_semana or 1,
+        horas_lun_default=sede.horas_lun_default or 8.5,
+        horas_mar_default=sede.horas_mar_default or 7.25,
+        horas_mie_default=sede.horas_mie_default or 7.25,
+        horas_jue_default=sede.horas_jue_default or 7.25,
+        horas_vie_default=sede.horas_vie_default or 7.25,
+        horas_sab_default=sede.horas_sab_default or 6.0,
+        horas_dom_default=sede.horas_dom_default or 0.0,
+    )
+
+
+@router.put("/config-semanas")
+def put_config_semanas(
+    data: ConfigSemanasIn,
     db: Session = Depends(get_db),
     user: Usuario = Depends(requiere_permiso("editar_catalogos")),
 ):
-    """Genera las 52/53 semanas ISO del año si no existen todavía."""
-    import datetime
     sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    sede.dia_inicio_semana = data.dia_inicio_semana
+    sede.horas_lun_default = data.horas_lun_default
+    sede.horas_mar_default = data.horas_mar_default
+    sede.horas_mie_default = data.horas_mie_default
+    sede.horas_jue_default = data.horas_jue_default
+    sede.horas_vie_default = data.horas_vie_default
+    sede.horas_sab_default = data.horas_sab_default
+    sede.horas_dom_default = data.horas_dom_default
+    db.commit()
+
+    actualizadas = 0
+    if data.propagar and data.año_propagar:
+        festivos = set(festivos_colombia(data.año_propagar))
+        semanas = db.query(Semana).filter_by(sede_id=sede_id, año=data.año_propagar).all()
+        plantilla = {
+            1: data.horas_lun_default, 2: data.horas_mar_default,
+            3: data.horas_mie_default, 4: data.horas_jue_default,
+            5: data.horas_vie_default, 6: data.horas_sab_default,
+            0: data.horas_dom_default,
+        }
+        for s in semanas:
+            if s.modificacion_manual:
+                continue
+            _aplicar_plantilla(s, plantilla, festivos)
+            actualizadas += 1
+        db.commit()
+
+    return {"ok": True, "actualizadas": actualizadas}
+
+
+@router.get("/festivos")
+def get_festivos(
+    año: int,
+    user: Usuario = Depends(get_current_user),
+):
+    return [str(f) for f in festivos_colombia(año)]
+
+
+def _aplicar_plantilla(semana: Semana, plantilla: dict, festivos: set):
+    """Aplica horas por día a la semana y recalcula horas_ordinarias."""
+    dias_festivo = []
+    total = 0.0
+    for idx, attr in [(1, "horas_lun"), (2, "horas_mar"), (3, "horas_mie"),
+                      (4, "horas_jue"), (5, "horas_vie"), (6, "horas_sab"), (0, "horas_dom")]:
+        horas = plantilla.get(idx, 0.0) or 0.0
+        # Verificar si alguna fecha de la semana con este día es festivo
+        if semana.fecha_inicio:
+            for offset in range(7):
+                d = semana.fecha_inicio + dt.timedelta(days=offset)
+                if _dia_idx(d) == idx and d in festivos:
+                    dias_festivo.append(idx)
+                    break
+        setattr(semana, attr, horas)
+        total += horas
+    semana.horas_ordinarias = total
+    semana.tiene_festivo = bool(dias_festivo)
+    semana.festivos_dias = json.dumps(dias_festivo)
+
+
+@router.post("/semanas/generar-ano")
+def generar_semanas_ano(
+    año: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    """Genera las 52/53 semanas ISO del año usando la plantilla de la sede."""
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    festivos = set(festivos_colombia(año))
+
+    plantilla = {
+        1: sede.horas_lun_default or 8.5,
+        2: sede.horas_mar_default or 7.25,
+        3: sede.horas_mie_default or 7.25,
+        4: sede.horas_jue_default or 7.25,
+        5: sede.horas_vie_default or 7.25,
+        6: sede.horas_sab_default or 6.0,
+        0: sede.horas_dom_default or 0.0,
+    }
+    total_default = sum(plantilla.values())
+
+    dia_inicio = sede.dia_inicio_semana or 1  # 0=Dom, 1=Lun
+
     creadas = 0
     omitidas = 0
-    # Determinar cuántas semanas ISO tiene el año
-    last_week = datetime.date(año, 12, 28).isocalendar()[1]  # semana 52 o 53
+    last_week = dt.date(año, 12, 28).isocalendar()[1]
     for w in range(1, last_week + 1):
-        codigo = f"{str(año)[2:]}{w:02d}"  # e.g. "2601"
+        codigo = f"{str(año)[2:]}{w:02d}"
         existente = db.query(Semana).filter_by(sede_id=sede_id, codigo=codigo).first()
         if existente:
             omitidas += 1
             continue
-        # Calcular fechas ISO
-        fecha_lunes = datetime.date.fromisocalendar(año, w, 1)
-        fecha_domingo = datetime.date.fromisocalendar(año, w, 7)
+
+        # Inicio de semana según config
+        if dia_inicio == 1:  # Lunes
+            fecha_ini = dt.date.fromisocalendar(año, w, 1)
+        else:  # Domingo
+            fecha_ini = dt.date.fromisocalendar(año, w, 1) - dt.timedelta(days=1)
+        fecha_fin = fecha_ini + dt.timedelta(days=6)
+
         semana = Semana(
             sede_id=sede_id,
             codigo=codigo,
             año=año,
-            horas_ordinarias=horas_ordinarias,
+            horas_ordinarias=total_default,
             tiene_festivo=False,
-            fecha_inicio=fecha_lunes,
-            fecha_cierre=fecha_domingo,
+            fecha_inicio=fecha_ini,
+            fecha_cierre=fecha_fin,
+            modificacion_manual=False,
         )
+        _aplicar_plantilla(semana, plantilla, festivos)
         db.add(semana)
         creadas += 1
     db.commit()
@@ -522,8 +688,15 @@ def actualizar_semana(
     semana = db.query(Semana).filter_by(id=id, sede_id=sede_id).first()
     if not semana:
         raise HTTPException(404, "Semana no encontrada")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    campos = data.model_dump(exclude_unset=True)
+    for k, v in campos.items():
         setattr(semana, k, v)
+    # Si se editaron horas por día, recalcular total y marcar modificación manual
+    dia_cols = ["horas_lun", "horas_mar", "horas_mie", "horas_jue", "horas_vie", "horas_sab", "horas_dom"]
+    if any(c in campos for c in dia_cols):
+        total = sum((getattr(semana, c) or 0) for c in dia_cols)
+        semana.horas_ordinarias = total
+        semana.modificacion_manual = True
     db.commit()
     db.refresh(semana)
     return semana
