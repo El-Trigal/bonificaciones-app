@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: bonificaciones-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # se setea manualmente en el dashboard
+      - key: BONIF_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
