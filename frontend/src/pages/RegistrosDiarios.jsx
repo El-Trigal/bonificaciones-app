@@ -337,7 +337,7 @@ export default function RegistrosDiarios() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6">
+    <div>
 
       {/* Encabezado */}
       <div className="flex items-center justify-between mb-6">

@@ -104,7 +104,7 @@ export default function Layout() {
         </header>
 
         {sinSede ? <SinSedeScreen /> : (
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">
             <Outlet />
           </main>
         )}

@@ -73,7 +73,7 @@ export default function PeriodosNomina() {
   }
 
   return (
-    <div className="p-6">
+    <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Periodos de nómina</h1>
         <p className="text-sm text-gray-500">Quincenas colombianas · pago 15 y fin de mes</p>
