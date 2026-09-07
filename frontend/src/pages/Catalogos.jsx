@@ -183,6 +183,8 @@ function TabLabores() {
   const [configModal, setConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState({});
   const [guardandoConfig, setGuardandoConfig] = useState(false);
+  const [filtroNombre, setFiltroNombre] = useState('');
+  const [filtroLider, setFiltroLider] = useState('');
 
   const defaults = {
     nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1,
@@ -334,6 +336,12 @@ function TabLabores() {
   const derivados = form.rendimiento_min_hora ? calcularDerivados(form) : null;
   const fmt = (v) => '$' + Math.round(v || 0).toLocaleString('es-CO');
 
+  const laboresFiltradas = labores.filter(l => {
+    const matchNombre = !filtroNombre || l.nombre.toLowerCase().includes(filtroNombre.toLowerCase());
+    const matchLider = !filtroLider || String(l.lider_id) === filtroLider;
+    return matchNombre && matchLider;
+  });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex justify-between mb-4">
@@ -352,6 +360,40 @@ function TabLabores() {
             <Plus size={16} /> Agregar
           </button>
         </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por labor..."
+          value={filtroNombre}
+          onChange={e => setFiltroNombre(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm flex-1 max-w-xs focus:outline-none focus:ring-2 focus:ring-primary-300"
+        />
+        <select
+          value={filtroLider}
+          onChange={e => setFiltroLider(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+        >
+          <option value="">Todos los líderes</option>
+          {lideres.filter(ld => ld.activo).map(ld => (
+            <option key={ld.id} value={String(ld.id)}>{ld.nombre}</option>
+          ))}
+        </select>
+        {(filtroNombre || filtroLider) && (
+          <button
+            onClick={() => { setFiltroNombre(''); setFiltroLider(''); }}
+            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2"
+          >
+            <X size={14} /> Limpiar
+          </button>
+        )}
+        {(filtroNombre || filtroLider) && (
+          <span className="text-sm text-gray-400 self-center">
+            {laboresFiltradas.length} de {labores.length}
+          </span>
+        )}
       </div>
 
       {loading ? <LoadingSpinner /> : (
@@ -376,7 +418,7 @@ function TabLabores() {
               </tr>
             </thead>
             <tbody>
-              {labores.map(l => (
+              {laboresFiltradas.map(l => (
                 <tr key={l.id} className={`border-b hover:bg-gray-50 ${seleccionados.has(l.id) ? 'bg-primary-50' : ''}`}>
                   <td className="px-2 py-2">
                     <input type="checkbox" checked={seleccionados.has(l.id)}

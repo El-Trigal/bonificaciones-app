@@ -122,6 +122,12 @@ class LaborRendimiento(Base):
 
     def recalcular_valores(self):
         horas_semana = 43.5
+        if not self.rendimiento_min_hora:
+            self.costo_estandar_tallo = 0.0
+            self.costo_estandar_ramo = 0.0
+            self.valor_unidad_colaborador = 0.0
+            self.valor_unidad_apoyo = 0.0
+            return
         self.costo_estandar_tallo = self.salario_base / (
             self.semanas_mes_promedio * horas_semana * self.rendimiento_min_hora
         )
