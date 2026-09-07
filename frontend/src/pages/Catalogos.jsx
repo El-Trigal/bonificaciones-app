@@ -115,7 +115,7 @@ function TabEmpleados() {
             </tr>
           </thead>
           <tbody>
-            {empleados.map(e => (
+            {empleados.filter(e => e.activo).map(e => (
               <tr key={e.id} className="border-b hover:bg-gray-50">
                 <td className="p-3 font-mono">{e.codigo}</td>
                 <td className="p-3">{e.nombre}</td>
@@ -337,6 +337,7 @@ function TabLabores() {
   const fmt = (v) => '$' + Math.round(v || 0).toLocaleString('es-CO');
 
   const laboresFiltradas = labores.filter(l => {
+    if (!l.activo) return false;
     const matchNombre = !filtroNombre || l.nombre.toLowerCase().includes(filtroNombre.toLowerCase());
     const matchLider = !filtroLider || String(l.lider_id) === filtroLider;
     return matchNombre && matchLider;
@@ -1068,7 +1069,7 @@ function CrudSimple({ endpoint, label, singular }) {
             </tr>
           </thead>
           <tbody>
-            {items.map(item => (
+            {items.filter(item => item.activo).map(item => (
               <tr key={item.id} className="border-b hover:bg-gray-50">
                 <td className="p-3">{item.nombre}</td>
                 {esLideres && (
