@@ -541,15 +541,16 @@ def get_config_semanas(
 ):
     sede_id = get_sede_activa(user)
     sede = db.query(Sede).filter_by(id=sede_id).first()
+    def _v(val, default): return val if val is not None else default
     return ConfigSemanasOut(
-        dia_inicio_semana=sede.dia_inicio_semana or 1,
-        horas_lun_default=sede.horas_lun_default or 8.5,
-        horas_mar_default=sede.horas_mar_default or 7.25,
-        horas_mie_default=sede.horas_mie_default or 7.25,
-        horas_jue_default=sede.horas_jue_default or 7.25,
-        horas_vie_default=sede.horas_vie_default or 7.25,
-        horas_sab_default=sede.horas_sab_default or 6.0,
-        horas_dom_default=sede.horas_dom_default or 0.0,
+        dia_inicio_semana=_v(sede.dia_inicio_semana, 1),
+        horas_lun_default=_v(sede.horas_lun_default, 8.5),
+        horas_mar_default=_v(sede.horas_mar_default, 7.25),
+        horas_mie_default=_v(sede.horas_mie_default, 7.25),
+        horas_jue_default=_v(sede.horas_jue_default, 7.25),
+        horas_vie_default=_v(sede.horas_vie_default, 7.25),
+        horas_sab_default=_v(sede.horas_sab_default, 6.0),
+        horas_dom_default=_v(sede.horas_dom_default, 0.0),
     )
 
 
@@ -600,21 +601,25 @@ def get_festivos(
 
 
 def _aplicar_plantilla(semana: Semana, plantilla: dict, festivos: set):
-    """Aplica horas por día a la semana y recalcula horas_ordinarias."""
+    """Aplica horas por día a la semana y recalcula horas_ordinarias.
+    Los días festivos se guardan con 0h (no se trabaja ese día).
+    """
     dias_festivo = []
     total = 0.0
     for idx, attr in [(1, "horas_lun"), (2, "horas_mar"), (3, "horas_mie"),
                       (4, "horas_jue"), (5, "horas_vie"), (6, "horas_sab"), (0, "horas_dom")]:
         horas = plantilla.get(idx, 0.0) or 0.0
-        # Verificar si alguna fecha de la semana con este día es festivo
+        es_festivo = False
         if semana.fecha_inicio:
             for offset in range(7):
                 d = semana.fecha_inicio + dt.timedelta(days=offset)
                 if _dia_idx(d) == idx and d in festivos:
                     dias_festivo.append(idx)
+                    es_festivo = True
                     break
-        setattr(semana, attr, horas)
-        total += horas
+        valor = 0.0 if es_festivo else horas
+        setattr(semana, attr, valor)
+        total += valor
     semana.horas_ordinarias = total
     semana.tiene_festivo = bool(dias_festivo)
     semana.festivos_dias = json.dumps(dias_festivo)
@@ -631,18 +636,19 @@ def generar_semanas_ano(
     sede = db.query(Sede).filter_by(id=sede_id).first()
     festivos = set(festivos_colombia(año))
 
+    def _sv(val, default): return val if val is not None else default
     plantilla = {
-        1: sede.horas_lun_default or 8.5,
-        2: sede.horas_mar_default or 7.25,
-        3: sede.horas_mie_default or 7.25,
-        4: sede.horas_jue_default or 7.25,
-        5: sede.horas_vie_default or 7.25,
-        6: sede.horas_sab_default or 6.0,
-        0: sede.horas_dom_default or 0.0,
+        1: _sv(sede.horas_lun_default, 8.5),
+        2: _sv(sede.horas_mar_default, 7.25),
+        3: _sv(sede.horas_mie_default, 7.25),
+        4: _sv(sede.horas_jue_default, 7.25),
+        5: _sv(sede.horas_vie_default, 7.25),
+        6: _sv(sede.horas_sab_default, 6.0),
+        0: _sv(sede.horas_dom_default, 0.0),
     }
     total_default = sum(plantilla.values())
 
-    dia_inicio = sede.dia_inicio_semana or 1  # 0=Dom, 1=Lun
+    dia_inicio = _sv(sede.dia_inicio_semana, 1)  # 0=Dom, 1=Lun
 
     creadas = 0
     omitidas = 0

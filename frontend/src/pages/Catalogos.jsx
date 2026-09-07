@@ -749,9 +749,10 @@ function TabSemanas() {
   const totalPags = Math.ceil(semanas.length / PAGE_SIZE);
   const pagActual = Math.floor(paginaOffset / PAGE_SIZE);
 
-  const totalConfig = DIA_KEYS.reduce((s, k, i) => s + (parseFloat(configForm[k] ?? config[DIA_CONFIG[i]]) || 0), 0);
-  const labConfig = [1,2,3,4,5].reduce((s, idx) => s + (parseFloat(configForm[DIA_KEYS[idx]] ?? config[DIA_CONFIG[idx]]) || 0), 0);
-  const finConfig = totalConfig - labConfig;
+  // DIA_CONFIG keys: [dom_default, lun_default, mar_default, mie_default, jue_default, vie_default, sab_default]
+  const totalConfig = DIA_CONFIG.reduce((s, k) => s + (parseFloat(configForm[k]) || 0), 0);
+  const labConfig = [1,2,3,4,5].reduce((s, idx) => s + (parseFloat(configForm[DIA_CONFIG[idx]]) || 0), 0);
+  const finConfig = [0,6].reduce((s, idx) => s + (parseFloat(configForm[DIA_CONFIG[idx]]) || 0), 0);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -898,7 +899,7 @@ function TabSemanas() {
           <div className="border rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Horas por día</p>
-              <span className="text-xs text-gray-400">Laborales: <strong>{labConfig}h</strong> | Fin semana: <strong>{finConfig}h</strong></span>
+              <span className="text-xs text-gray-400">Lun–Vie: <strong>{labConfig}h</strong> | Sáb–Dom: <strong>{finConfig}h</strong></span>
             </div>
             <div className="grid grid-cols-7 gap-2">
               {diasOrdenados(configForm.dia_inicio_semana ?? 1).map(diaIdx => {
@@ -916,7 +917,7 @@ function TabSemanas() {
             </div>
             {/* Resumen */}
             <div className="grid grid-cols-3 gap-3 mt-4">
-              {[['TOTAL', totalConfig], ['LABORALES', labConfig], ['FIN SEMANA', finConfig]].map(([l, v]) => (
+              {[['TOTAL', totalConfig], ['LUN–VIE', labConfig], ['SÁB–DOM', finConfig]].map(([l, v]) => (
                 <div key={l} className="border rounded-lg p-3 text-center">
                   <div className="text-xs text-gray-400 mb-1">{l}</div>
                   <div className="text-xl font-bold text-gray-800">{v}h</div>
