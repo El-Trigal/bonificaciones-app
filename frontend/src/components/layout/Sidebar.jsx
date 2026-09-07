@@ -14,7 +14,6 @@ const links = [
   { to: '/calidad', icon: Award, label: 'Calidad y Cálculo', permiso: 'ejecutar_calculo' },
   { to: '/liquidaciones', icon: FileText, label: 'Liquidaciones', permiso: 'ver_liquidaciones' },
   { to: '/periodos', icon: Calendar, label: 'Periodos nómina', permiso: 'ver_liquidaciones' },
-  { to: '/ajustes', icon: History, label: 'Ajustes retroactivos', permiso: 'ver_liquidaciones' },
   { to: '/trazabilidad', icon: Search, label: 'Trazabilidad', permiso: 'ver_trazabilidad' },
   { to: '/informes', icon: BarChart3, label: 'Informes', permiso: 'ver_informes' },
   { to: '/catalogos', icon: Settings, label: 'Catálogos', permiso: 'editar_catalogos' },
