@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 from database import engine, Base, SessionLocal
 from seed import seed_database
-from migracion_v2 import migrar_usuarios_seguridad
+from migracion_v2 import migrar_usuarios_seguridad, migrar_sedes
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
@@ -24,6 +24,7 @@ Base.metadata.create_all(bind=engine)
 # create_all no altera tablas ya existentes: columnas nuevas en modelos ya
 # desplegados deben agregarse explícitamente (idempotente, seguro en cada arranque)
 migrar_usuarios_seguridad()
+migrar_sedes()
 
 # Seed de datos iniciales
 db = SessionLocal()
