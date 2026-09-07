@@ -621,21 +621,24 @@ function TabLabores() {
 
 // ─── Tab Semanas ───────────────────────────────────────
 function TabSemanas() {
+  const añoActual = new Date().getFullYear();
+  const [año, setAño] = useState(añoActual);
   const [semanas, setSemanasData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [generando, setGenerando] = useState(false);
   const [editando, setEditando] = useState(null);
   const [editVal, setEditVal] = useState({});
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/catalogos/semanas', { params: { año: 2026 } });
+      const { data } = await api.get('/catalogos/semanas', { params: { año } });
       setSemanasData(data);
     } catch (e) { console.error(e); }
     setLoading(false);
-  };
+  }, [año]);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [cargar]);
 
   const guardarSemana = async (id) => {
     try {
@@ -645,87 +648,111 @@ function TabSemanas() {
     } catch (e) { alert('Error al guardar'); }
   };
 
+  const generarSemanas = async () => {
+    if (!confirm(`¿Generar las semanas del año ${año}?\n\nSe crearán con 48 horas ordinarias por defecto. Podrás editar las semanas con festivos o horas distintas una por una después.`)) return;
+    setGenerando(true);
+    try {
+      const { data } = await api.post('/catalogos/semanas/generar-ano', null, { params: { año, horas_ordinarias: 48 } });
+      alert(`Semanas generadas: ${data.creadas}\nYa existían: ${data.omitidas}`);
+      cargar();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Error al generar semanas');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  const festivas = semanas.filter(s => s.tiene_festivo).length;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border p-6">
-      <h3 className="font-semibold text-gray-700 mb-4">Semanas 2026</h3>
-      {loading ? <LoadingSpinner /> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-          <table className="text-sm">
+      <div className="flex items-start justify-between mb-4 gap-4">
+        <div>
+          <h3 className="font-semibold text-gray-700">Semanas laborales</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Las horas ordinarias por semana determinan el umbral mínimo del 83% exigido al colaborador para acceder a bonificación de rendimiento.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <select value={año} onChange={e => setAño(parseInt(e.target.value))}
+            className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-300">
+            {[añoActual - 1, añoActual, añoActual + 1].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <button onClick={generarSemanas} disabled={generando}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800 disabled:opacity-50">
+            <Plus size={15} /> {generando ? 'Generando...' : `Generar semanas ${año}`}
+          </button>
+        </div>
+      </div>
+
+      {!loading && semanas.length > 0 && (
+        <div className="flex gap-4 mb-4 text-sm">
+          <span className="text-gray-500">{semanas.length} semanas</span>
+          {festivas > 0 && (
+            <span className="text-amber-600 font-medium">{festivas} con festivo</span>
+          )}
+        </div>
+      )}
+
+      {loading ? <LoadingSpinner /> : semanas.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-base mb-1">No hay semanas para el año {año}</p>
+          <p className="text-sm">Usa el botón "Generar semanas {año}" para crearlas automáticamente.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Semana</th>
-                <th className="text-right p-2">Horas Ord.</th>
+                <th className="text-left p-2">Código</th>
+                <th className="text-left p-2">Fechas</th>
+                <th className="text-right p-2">Horas ord.</th>
                 <th className="text-center p-2">Festivo</th>
-                <th className="p-2">Acc.</th>
+                <th className="p-2 w-20">Acc.</th>
               </tr>
             </thead>
             <tbody>
-              {semanas.filter((_, i) => i < 26).map(s => (
-                <tr key={s.id} className={`border-b ${s.tiene_festivo ? 'bg-amber-50' : ''}`}>
-                  <td className="p-2 font-mono">{s.codigo}</td>
+              {semanas.map(s => (
+                <tr key={s.id} className={`border-b hover:bg-gray-50 ${s.tiene_festivo ? 'bg-amber-50 hover:bg-amber-100' : ''}`}>
+                  <td className="p-2 font-mono font-medium">{s.codigo}</td>
+                  <td className="p-2 text-gray-500 text-xs">
+                    {s.fecha_inicio && s.fecha_cierre
+                      ? `${s.fecha_inicio} → ${s.fecha_cierre}`
+                      : <span className="italic text-gray-300">—</span>}
+                  </td>
                   <td className="p-2 text-right">
                     {editando === s.id ? (
-                      <input type="number" step="0.25" value={editVal.horas_ordinarias}
+                      <input type="number" step="0.25" min="0" value={editVal.horas_ordinarias}
                         onChange={e => setEditVal({...editVal, horas_ordinarias: parseFloat(e.target.value)})}
-                        className="w-20 border rounded px-2 py-1 text-right" />
-                    ) : s.horas_ordinarias}
-                  </td>
-                  <td className="p-2 text-center">
-                    {editando === s.id ? (
-                      <input type="checkbox" checked={editVal.tiene_festivo}
-                        onChange={e => setEditVal({...editVal, tiene_festivo: e.target.checked})} />
-                    ) : s.tiene_festivo ? '🔴' : ''}
-                  </td>
-                  <td className="p-2 text-center">
-                    {editando === s.id ? (
-                      <div className="flex gap-1">
-                        <button onClick={() => guardarSemana(s.id)} className="text-green-600"><Save size={14} /></button>
-                        <button onClick={() => setEditando(null)} className="text-gray-400"><X size={14} /></button>
-                      </div>
+                        className="w-20 border rounded px-2 py-1 text-right" autoFocus />
                     ) : (
-                      <button onClick={() => { setEditando(s.id); setEditVal({ horas_ordinarias: s.horas_ordinarias, tiene_festivo: s.tiene_festivo }); }}
-                        className="p-1 hover:bg-gray-100 rounded"><Pencil size={14} /></button>
+                      <span className="font-mono">{s.horas_ordinarias}</span>
                     )}
                   </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <table className="text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-2">Semana</th>
-                <th className="text-right p-2">Horas Ord.</th>
-                <th className="text-center p-2">Festivo</th>
-                <th className="p-2">Acc.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {semanas.filter((_, i) => i >= 26).map(s => (
-                <tr key={s.id} className={`border-b ${s.tiene_festivo ? 'bg-amber-50' : ''}`}>
-                  <td className="p-2 font-mono">{s.codigo}</td>
-                  <td className="p-2 text-right">
-                    {editando === s.id ? (
-                      <input type="number" step="0.25" value={editVal.horas_ordinarias}
-                        onChange={e => setEditVal({...editVal, horas_ordinarias: parseFloat(e.target.value)})}
-                        className="w-20 border rounded px-2 py-1 text-right" />
-                    ) : s.horas_ordinarias}
-                  </td>
                   <td className="p-2 text-center">
                     {editando === s.id ? (
                       <input type="checkbox" checked={editVal.tiene_festivo}
-                        onChange={e => setEditVal({...editVal, tiene_festivo: e.target.checked})} />
-                    ) : s.tiene_festivo ? '🔴' : ''}
+                        onChange={e => setEditVal({...editVal, tiene_festivo: e.target.checked})}
+                        className="rounded" />
+                    ) : (
+                      s.tiene_festivo
+                        ? <span className="inline-block w-3 h-3 rounded-full bg-amber-400" title="Semana con festivo" />
+                        : null
+                    )}
                   </td>
                   <td className="p-2 text-center">
                     {editando === s.id ? (
-                      <div className="flex gap-1">
-                        <button onClick={() => guardarSemana(s.id)} className="text-green-600"><Save size={14} /></button>
-                        <button onClick={() => setEditando(null)} className="text-gray-400"><X size={14} /></button>
+                      <div className="flex gap-1 justify-center">
+                        <button onClick={() => guardarSemana(s.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Save size={14} /></button>
+                        <button onClick={() => setEditando(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X size={14} /></button>
                       </div>
                     ) : (
                       <button onClick={() => { setEditando(s.id); setEditVal({ horas_ordinarias: s.horas_ordinarias, tiene_festivo: s.tiene_festivo }); }}
-                        className="p-1 hover:bg-gray-100 rounded"><Pencil size={14} /></button>
+                        className="p-1 hover:bg-gray-100 rounded" title="Editar">
+                        <Pencil size={14} />
+                      </button>
                     )}
                   </td>
                 </tr>

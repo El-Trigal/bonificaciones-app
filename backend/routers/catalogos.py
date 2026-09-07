@@ -474,6 +474,44 @@ def crear_semana(
     return semana
 
 
+@router.post("/semanas/generar-ano")
+def generar_semanas_ano(
+    año: int,
+    horas_ordinarias: float = 48.0,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    """Genera las 52/53 semanas ISO del año si no existen todavía."""
+    import datetime
+    sede_id = get_sede_activa(user)
+    creadas = 0
+    omitidas = 0
+    # Determinar cuántas semanas ISO tiene el año
+    last_week = datetime.date(año, 12, 28).isocalendar()[1]  # semana 52 o 53
+    for w in range(1, last_week + 1):
+        codigo = f"{str(año)[2:]}{w:02d}"  # e.g. "2601"
+        existente = db.query(Semana).filter_by(sede_id=sede_id, codigo=codigo).first()
+        if existente:
+            omitidas += 1
+            continue
+        # Calcular fechas ISO
+        fecha_lunes = datetime.date.fromisocalendar(año, w, 1)
+        fecha_domingo = datetime.date.fromisocalendar(año, w, 7)
+        semana = Semana(
+            sede_id=sede_id,
+            codigo=codigo,
+            año=año,
+            horas_ordinarias=horas_ordinarias,
+            tiene_festivo=False,
+            fecha_inicio=fecha_lunes,
+            fecha_cierre=fecha_domingo,
+        )
+        db.add(semana)
+        creadas += 1
+    db.commit()
+    return {"creadas": creadas, "omitidas": omitidas, "año": año}
+
+
 @router.put("/semanas/{id}", response_model=SemanaOut)
 def actualizar_semana(
     id: int, data: SemanaUpdate,
