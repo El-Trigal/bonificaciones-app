@@ -27,60 +27,9 @@ from schemas import (
 )
 from services.calculador import CURVA_CALIDAD_DEFAULT
 from services.auth import get_current_user, get_sede_activa, requiere_permiso
+from services.utils_semana import festivos_colombia
 
 router = APIRouter()
-
-
-# ─── Festivos colombianos ──────────────────────────────────
-def _pascua(año: int) -> dt.date:
-    """Calcula la fecha de Pascua (Domingo de Resurrección) para el año dado."""
-    a = año % 19
-    b, c = divmod(año, 100)
-    d, e = divmod(b, 4)
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i, k = divmod(c, 4)
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    mes = (h + l - 7 * m + 114) // 31
-    dia = (h + l - 7 * m + 114) % 31 + 1
-    return dt.date(año, mes, dia)
-
-
-def _siguiente_lunes(d: dt.date) -> dt.date:
-    """Retorna d si es lunes, sino el lunes siguiente (Ley Emiliani)."""
-    dias = (7 - d.weekday()) % 7
-    return d if dias == 0 else d + dt.timedelta(days=dias)
-
-
-def festivos_colombia(año: int) -> list[dt.date]:
-    """Retorna lista de festivos colombianos para el año dado."""
-    pascua = _pascua(año)
-    festivos = [
-        # Fijos
-        dt.date(año, 1, 1),
-        dt.date(año, 5, 1),
-        dt.date(año, 7, 20),
-        dt.date(año, 8, 7),
-        dt.date(año, 12, 8),
-        dt.date(año, 12, 25),
-        # Semana Santa (fijos relativos a Pascua)
-        pascua - dt.timedelta(days=3),   # Jueves Santo
-        pascua - dt.timedelta(days=2),   # Viernes Santo
-        # Ley Emiliani
-        _siguiente_lunes(dt.date(año, 1, 6)),
-        _siguiente_lunes(dt.date(año, 3, 19)),
-        _siguiente_lunes(dt.date(año, 6, 29)),
-        _siguiente_lunes(dt.date(año, 8, 15)),
-        _siguiente_lunes(dt.date(año, 10, 12)),
-        _siguiente_lunes(dt.date(año, 11, 1)),
-        _siguiente_lunes(dt.date(año, 11, 11)),
-        _siguiente_lunes(pascua + dt.timedelta(days=39)),   # Ascensión
-        _siguiente_lunes(pascua + dt.timedelta(days=60)),   # Corpus Christi
-        _siguiente_lunes(pascua + dt.timedelta(days=68)),   # Sagrado Corazón
-    ]
-    return sorted(set(festivos))
 
 
 def _dia_idx(fecha: dt.date) -> int:

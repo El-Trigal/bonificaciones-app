@@ -12,7 +12,7 @@ from database import get_db
 from models import CargaCsv, LaborRendimiento, PlantillaCarga, RegistroDiario, Usuario
 from services.auth import get_sede_activa, requiere_permiso
 from services.parser_generico import parsear
-from services.utils_semana import normalizar_codigo_semana, semana_desde_fecha
+from services.utils_semana import normalizar_codigo_semana, semana_desde_fecha, festivos_colombia
 
 router = APIRouter(prefix="/api/registros-diarios", tags=["Registros Diarios"])
 
@@ -213,11 +213,31 @@ def crear_manual(
     user: Usuario = Depends(requiere_permiso("editar_registros")),
 ):
     sede_id = get_sede_activa(user)
+
+    # Validar horas ordinarias en festivo o domingo
+    if data.horas_ordinarias > 0:
+        festivos = set(festivos_colombia(data.fecha.year))
+        es_festivo = data.fecha in festivos
+        es_domingo = data.fecha.weekday() == 6
+        if es_festivo:
+            raise HTTPException(
+                400,
+                f"El {data.fecha.strftime('%d/%m/%Y')} es festivo. "
+                "Las horas ordinarias deben ser 0. Usa el campo de horas dominicales."
+            )
+        if es_domingo:
+            raise HTTPException(
+                400,
+                f"El {data.fecha.strftime('%d/%m/%Y')} es domingo. "
+                "Las horas ordinarias deben ser 0. Usa el campo de horas dominicales."
+            )
+
     if db.query(RegistroDiario).filter_by(
         sede_id=sede_id, fecha=data.fecha,
         codigo_colaborador=data.codigo_colaborador, labor=data.labor
     ).first():
         raise HTTPException(409, "Ya existe un registro para esa fecha/colaborador/labor")
+
     reg = RegistroDiario(
         **data.model_dump(),
         sede_id=sede_id,
