@@ -175,14 +175,20 @@ function TabLabores() {
   const [recomputando, setRecomputando] = useState(false);
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [curvaModal, setCurvaModal] = useState(null);
-  const [salarioDefault, setSalarioDefault] = useState(1423500);
-  const [editandoDefault, setEditandoDefault] = useState(false);
-  const [nuevoDefault, setNuevoDefault] = useState('');
-  const [guardandoDefault, setGuardandoDefault] = useState(false);
+  const [configNomina, setConfigNomina] = useState({
+    salario_base_default: 1423500, horas_mensuales_default: 240,
+    recargo_he_diurna_pct: 25, recargo_dominical_pct: 75,
+    tarifa_he_ordinaria: 7736, tarifa_he_dominical: 12378,
+  });
+  const [configModal, setConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState({});
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
 
   const defaults = {
     nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1,
-    salario_base: salarioDefault, tarifa_he_ordinaria: 7736, tarifa_he_dominical: 12378,
+    salario_base: configNomina.salario_base_default,
+    tarifa_he_ordinaria: configNomina.tarifa_he_ordinaria,
+    tarifa_he_dominical: configNomina.tarifa_he_dominical,
     semanas_mes_promedio: 4.33, pct_a_pagar_colaboradores: 0.60,
     pct_cortadores: 0.86, pct_apoyo: 0.14,
   };
@@ -196,50 +202,58 @@ function TabLabores() {
     setLoading(false);
   };
 
-  const cargarConfig = async () => {
+  const cargarConfigNomina = async () => {
     try {
-      const { data } = await api.get('/catalogos/config-labores');
-      setSalarioDefault(data.salario_base_default);
+      const { data } = await api.get('/catalogos/config-nomina');
+      setConfigNomina(data);
     } catch (e) { console.error(e); }
   };
 
-  const guardarSalarioDefault = async (propagar) => {
-    const nuevo = parseFloat(nuevoDefault);
-    if (!nuevo || nuevo <= 0) { alert('Ingrese un salario válido.'); return; }
-    setGuardandoDefault(true);
+  const abrirConfigModal = () => {
+    setConfigForm({
+      salario_base_default: configNomina.salario_base_default,
+      horas_mensuales_default: configNomina.horas_mensuales_default,
+      recargo_he_diurna_pct: configNomina.recargo_he_diurna_pct,
+      recargo_dominical_pct: configNomina.recargo_dominical_pct,
+    });
+    setConfigModal(true);
+  };
+
+  const guardarConfigNomina = async () => {
+    const salario = parseFloat(configForm.salario_base_default) || 0;
+    const horas = parseFloat(configForm.horas_mensuales_default) || 240;
+    const pctHe = parseFloat(configForm.recargo_he_diurna_pct) || 0;
+    const pctDom = parseFloat(configForm.recargo_dominical_pct) || 0;
+    if (!salario || salario <= 0) { alert('Ingrese un salario válido.'); return; }
+    const vho = salario / horas;
+    const tarifaHe = Math.round(vho * (1 + pctHe / 100));
+    const tarifaDom = Math.round(vho * (1 + pctDom / 100));
+    const activas = labores.filter(l => l.activo).length;
+    const ok = confirm(
+      `Este cambio actualizará los valores en ${activas} labor${activas !== 1 ? 'es' : ''} activa${activas !== 1 ? 's' : ''}:\n\n` +
+      `• Salario base: $${salario.toLocaleString('es-CO')}\n` +
+      `• Tarifa HE ordinaria: $${tarifaHe.toLocaleString('es-CO')}\n` +
+      `• Tarifa dominical: $${tarifaDom.toLocaleString('es-CO')}\n\n` +
+      `Los valores derivados se recalcularán automáticamente. Afecta liquidaciones futuras.\n\n` +
+      `Aceptar = Propagar a todas las labores activas\n` +
+      `Cancelar = Solo guardar configuración`
+    );
+    setGuardandoConfig(true);
     try {
-      await api.put('/catalogos/config-labores', { salario_base_default: nuevo, propagar });
-      setSalarioDefault(nuevo);
-      setEditandoDefault(false);
-      setNuevoDefault('');
-      if (propagar) cargar();
+      const { data } = await api.put('/catalogos/config-nomina', { ...configForm, propagar: ok });
+      setConfigNomina(data);
+      setConfigModal(false);
+      if (ok) cargar();
     } catch (e) {
       alert(e.response?.data?.detail || 'Error al guardar');
     } finally {
-      setGuardandoDefault(false);
+      setGuardandoConfig(false);
     }
-  };
-
-  const confirmarCambioDefault = () => {
-    const nuevo = parseFloat(nuevoDefault);
-    if (!nuevo || nuevo <= 0) { alert('Ingrese un salario válido.'); return; }
-    const activas = labores.filter(l => l.activo).length;
-    const ok = confirm(
-      `Cambiar el salario base por defecto a $${nuevo.toLocaleString('es-CO')}.\n\n` +
-      `Si elige "Propagar a todas las labores", se actualizará el salario base ` +
-      `de ${activas} labor${activas !== 1 ? 'es' : ''} activa${activas !== 1 ? 's' : ''} ` +
-      `y se recalcularán automáticamente sus valores derivados ` +
-      `(costo estándar, valor por unidad). Esto afecta liquidaciones futuras.\n\n` +
-      `¿Desea propagar el cambio a todas las labores activas?\n\n` +
-      `Aceptar = Propagar a todas las labores\n` +
-      `Cancelar = Solo guardar el nuevo valor por defecto (sin cambiar labores existentes)`
-    );
-    guardarSalarioDefault(ok);
   };
 
   useEffect(() => {
     cargar();
-    cargarConfig();
+    cargarConfigNomina();
     api.get('/catalogos/lideres').then(({ data }) => setLideres(data)).catch(() => setLideres([]));
   }, []);
 
@@ -329,50 +343,15 @@ function TabLabores() {
             className="flex items-center gap-2 px-3 py-2 bg-white border border-primary-700 text-primary-700 rounded-lg text-sm hover:bg-primary-50 disabled:opacity-50">
             {recomputando ? 'Recomputando...' : 'Recomputar líderes en registros'}
           </button>
+          <button onClick={abrirConfigModal}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-primary-700 text-primary-700 rounded-lg text-sm hover:bg-primary-50">
+            <Settings2 size={15} /> Configuración de nómina
+          </button>
           <button onClick={() => { setForm({...defaults}); setModal('crear'); }}
             className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm hover:bg-primary-800">
             <Plus size={16} /> Agregar
           </button>
         </div>
-      </div>
-
-      {/* Panel salario base por defecto */}
-      <div className="mb-4 p-4 bg-gray-50 border rounded-lg flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium text-gray-700">Salario base por defecto:</span>
-        {editandoDefault ? (
-          <>
-            <input
-              type="number" step="100" autoFocus
-              value={nuevoDefault}
-              onChange={e => setNuevoDefault(e.target.value)}
-              className="border rounded-lg px-3 py-1.5 text-sm w-40"
-              placeholder={salarioDefault}
-            />
-            <button
-              onClick={confirmarCambioDefault}
-              disabled={guardandoDefault}
-              className="px-3 py-1.5 bg-primary-700 text-white text-sm rounded-lg hover:bg-primary-800 disabled:opacity-50">
-              {guardandoDefault ? 'Guardando...' : 'Guardar'}
-            </button>
-            <button
-              onClick={() => { setEditandoDefault(false); setNuevoDefault(''); }}
-              className="px-3 py-1.5 border text-sm rounded-lg hover:bg-gray-100">
-              Cancelar
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="font-mono font-semibold text-gray-800">
-              ${salarioDefault.toLocaleString('es-CO')}
-            </span>
-            <button
-              onClick={() => { setNuevoDefault(salarioDefault); setEditandoDefault(true); }}
-              className="px-3 py-1.5 border text-sm rounded-lg hover:bg-gray-100 flex items-center gap-1">
-              <Pencil size={13} /> Cambiar
-            </button>
-            <span className="text-xs text-gray-400">Se pre-llena al crear una nueva labor. Al cambiar, puedes propagarlo a todas las labores activas.</span>
-          </>
-        )}
       </div>
 
       {loading ? <LoadingSpinner /> : (
@@ -497,6 +476,94 @@ function TabLabores() {
           <Save size={16} className="inline mr-2" />Guardar
         </button>
       </Modal>
+
+      {/* Modal configuración de nómina */}
+      {(() => {
+        const salario = parseFloat(configForm.salario_base_default) || 0;
+        const horas   = parseFloat(configForm.horas_mensuales_default) || 240;
+        const vho     = salario / horas;
+        const fmtP    = v => '$' + Math.round(v || 0).toLocaleString('es-CO');
+        const recargos = [
+          { key: 'recargo_he_diurna_pct',  label: 'HE Diurna',  badge: 'Art. 168 CST', cls: 'bg-orange-50 text-orange-700' },
+          { key: 'recargo_dominical_pct',   label: 'Dominical',  badge: 'Art. 179 CST', cls: 'bg-purple-50 text-purple-700' },
+        ];
+        return (
+          <Modal isOpen={configModal} onClose={() => setConfigModal(false)} title="Configuración Global de Nómina" size="md">
+            {/* Parámetros base */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Parámetros base</p>
+              <div className="flex items-stretch border rounded-lg overflow-hidden bg-gray-50">
+                <div className="flex-1 p-3 min-w-0">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Salario mensual</label>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-gray-400 font-bold text-base">$</span>
+                    <input type="number" value={configForm.salario_base_default ?? ''} min="0" step="100"
+                      onChange={e => setConfigForm({...configForm, salario_base_default: e.target.value})}
+                      className="w-full bg-transparent border-none outline-none text-lg font-bold text-primary-800" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-center w-8 border-l text-gray-300 text-xl font-light flex-shrink-0">÷</div>
+                <div className="p-3 border-l w-28 flex-shrink-0">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Horas/mes</label>
+                  <input type="number" value={configForm.horas_mensuales_default ?? ''} min="1" step="1"
+                    onChange={e => setConfigForm({...configForm, horas_mensuales_default: e.target.value})}
+                    className="w-full bg-transparent border-none outline-none text-lg font-bold text-primary-800" />
+                </div>
+                <div className="flex items-center justify-center w-8 border-l text-gray-300 text-xl font-light flex-shrink-0">=</div>
+                <div className="p-3 border-l bg-green-50 border-green-200 w-36 flex-shrink-0">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-green-600 opacity-70 mb-1">Hora ordinaria</label>
+                  <div className="text-lg font-bold text-green-700 font-mono">{vho > 0 ? fmtP(vho) : '—'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recargos */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Recargos legales</p>
+              <div className="grid grid-cols-2 gap-3">
+                {recargos.map(({ key, label, badge, cls }) => {
+                  const pct    = parseFloat(configForm[key]) || 0;
+                  const factor = 1 + pct / 100;
+                  const tarifa = vho * factor;
+                  return (
+                    <div key={key} className="border rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50">
+                        <span className="text-sm font-semibold text-primary-800">{label}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{badge}</span>
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="text-xs text-gray-500 whitespace-nowrap">Recargo</label>
+                          <div className="flex items-center border rounded-lg overflow-hidden flex-1 focus-within:border-primary-600">
+                            <input type="number" value={configForm[key] ?? ''} min="0" max="999"
+                              onChange={e => setConfigForm({...configForm, [key]: e.target.value})}
+                              className="flex-1 px-2 py-1.5 text-sm font-bold text-primary-800 border-none outline-none bg-transparent w-0 min-w-0" />
+                            <span className="px-2 py-1.5 text-xs font-semibold text-gray-400 border-l bg-gray-50">%</span>
+                          </div>
+                          <span className="text-xs font-semibold text-gray-500 bg-gray-100 border px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">× {factor.toFixed(2)}</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-2">
+                          <div className="text-xs text-gray-400 mb-1 font-mono">{vho > 0 ? `${fmtP(vho)} × ${factor.toFixed(2)}` : '—'}</div>
+                          <div className="text-lg font-bold text-green-700 font-mono">{tarifa > 0 ? fmtP(tarifa) : '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+              Al guardar, podrás propagar estas tarifas a todas las labores activas. <strong className="text-gray-600">Solo afecta liquidaciones futuras</strong>; períodos cerrados no cambian.
+            </p>
+            <button onClick={guardarConfigNomina} disabled={guardandoConfig}
+              className="w-full py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+              <Save size={15} />
+              {guardandoConfig ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </Modal>
+        );
+      })()}
 
       {curvaModal && (
         <CurvaCalidadModal

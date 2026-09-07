@@ -44,6 +44,9 @@ def crear_tablas_nuevas():
 def migrar_sedes():
     print("[1b] Agregando columnas a 'sedes'...")
     agregar_columna_si_falta("sedes", "salario_base_default", "REAL DEFAULT 1423500")
+    agregar_columna_si_falta("sedes", "horas_mensuales_default", "REAL DEFAULT 240")
+    agregar_columna_si_falta("sedes", "recargo_he_diurna_pct", "REAL DEFAULT 25")
+    agregar_columna_si_falta("sedes", "recargo_dominical_pct", "REAL DEFAULT 75")
 
 
 def migrar_semanas():

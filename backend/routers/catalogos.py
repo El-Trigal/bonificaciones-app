@@ -20,6 +20,7 @@ from schemas import (
     TipoBonificacionCreate, TipoBonificacionOut,
     CurvaCalidadOut, GuardarCurvaIn, GuardarCurvaBulkIn, ReglaCalidadOut,
     ConfigLaboresOut, ConfigLaboresIn,
+    ConfigNominaOut, ConfigNominaIn,
 )
 from services.calculador import CURVA_CALIDAD_DEFAULT
 from services.auth import get_current_user, get_sede_activa, requiere_permiso
@@ -319,6 +320,65 @@ def set_config_labores(
         db.commit()
 
     return {"salario_base_default": sede.salario_base_default}
+
+
+@router.get("/config-nomina", response_model=ConfigNominaOut)
+def get_config_nomina(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    salario = sede.salario_base_default or 1423500
+    horas = sede.horas_mensuales_default or 240
+    pct_he = sede.recargo_he_diurna_pct if sede.recargo_he_diurna_pct is not None else 25
+    pct_dom = sede.recargo_dominical_pct if sede.recargo_dominical_pct is not None else 75
+    vho = salario / horas
+    return {
+        "salario_base_default": salario,
+        "horas_mensuales_default": horas,
+        "recargo_he_diurna_pct": pct_he,
+        "recargo_dominical_pct": pct_dom,
+        "tarifa_he_ordinaria": round(vho * (1 + pct_he / 100), 2),
+        "tarifa_he_dominical": round(vho * (1 + pct_dom / 100), 2),
+    }
+
+
+@router.put("/config-nomina", response_model=ConfigNominaOut)
+def set_config_nomina(
+    data: ConfigNominaIn,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    sede.salario_base_default = data.salario_base_default
+    sede.horas_mensuales_default = data.horas_mensuales_default
+    sede.recargo_he_diurna_pct = data.recargo_he_diurna_pct
+    sede.recargo_dominical_pct = data.recargo_dominical_pct
+    db.commit()
+
+    vho = data.salario_base_default / data.horas_mensuales_default
+    tarifa_he = round(vho * (1 + data.recargo_he_diurna_pct / 100), 2)
+    tarifa_dom = round(vho * (1 + data.recargo_dominical_pct / 100), 2)
+
+    if data.propagar:
+        labores = db.query(LaborRendimiento).filter_by(sede_id=sede_id, activo=True).all()
+        for labor in labores:
+            labor.salario_base = data.salario_base_default
+            labor.tarifa_he_ordinaria = tarifa_he
+            labor.tarifa_he_dominical = tarifa_dom
+            labor.recalcular_valores()
+        db.commit()
+
+    return {
+        "salario_base_default": sede.salario_base_default,
+        "horas_mensuales_default": sede.horas_mensuales_default,
+        "recargo_he_diurna_pct": sede.recargo_he_diurna_pct,
+        "recargo_dominical_pct": sede.recargo_dominical_pct,
+        "tarifa_he_ordinaria": tarifa_he,
+        "tarifa_he_dominical": tarifa_dom,
+    }
 
 
 @router.get("/labores-rendimiento", response_model=List[LaborRendimientoOut])

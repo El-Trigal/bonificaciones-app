@@ -122,6 +122,21 @@ class ConfigLaboresIn(BaseModel):
     salario_base_default: float
     propagar: bool = False
 
+class ConfigNominaOut(BaseModel):
+    salario_base_default: float
+    horas_mensuales_default: float
+    recargo_he_diurna_pct: float
+    recargo_dominical_pct: float
+    tarifa_he_ordinaria: float
+    tarifa_he_dominical: float
+
+class ConfigNominaIn(BaseModel):
+    salario_base_default: float
+    horas_mensuales_default: float = 240
+    recargo_he_diurna_pct: float = 25
+    recargo_dominical_pct: float = 75
+    propagar: bool = False
+
 
 # ─── Curva de Calidad ───────────────────────────────────
 class ReglaCalidadIn(BaseModel):

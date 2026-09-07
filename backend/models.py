@@ -18,6 +18,9 @@ class Sede(Base):
     codigo = Column(Text, unique=True, nullable=False)  # MAN | CAR | OLA | AGC
     activo = Column(Boolean, default=True)
     salario_base_default = Column(Float, default=1423500)
+    horas_mensuales_default = Column(Float, default=240)
+    recargo_he_diurna_pct = Column(Float, default=25)
+    recargo_dominical_pct = Column(Float, default=75)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     usuarios = relationship("Usuario", back_populates="sede")
