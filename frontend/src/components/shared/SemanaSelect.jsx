@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../../store/api';
 import { useAppStore } from '../../store/appStore';
+import ComboBox from './ComboBox';
 
 let cache = null;
 let cargando = null;
@@ -17,13 +18,13 @@ async function cargarSemanas() {
 export function invalidarCacheSemanas() { cache = null; cargando = null; }
 
 /**
- * Select global de semanas. Sincroniza con appStore.selectedSemana:
- * cualquier cambio en una página se refleja en las demás.
+ * Selector de semanas con búsqueda por texto. Sincroniza con appStore.selectedSemana.
  *
  * Props:
- *  - value / onChange: control local (ambos opcionales; si faltan usa el store)
- *  - allowEmpty: muestra opción "— Todas —" (para filtros)
- *  - syncGlobal: default true. Si false, no escribe al store.
+ *  - value / onChange: control local
+ *  - allowEmpty: muestra opción "— Todas —"
+ *  - syncGlobal: default true
+ *  - autoPick: default true — prellenar desde store si no hay valor local
  *  - className: estilos extra
  */
 export default function SemanaSelect({
@@ -42,31 +43,41 @@ export default function SemanaSelect({
     cargarSemanas().then(setSemanas);
   }, []);
 
-  // Al montar: si no hay valor local pero sí global, prellenar vía onChange.
+  // Al montar: prellenar desde store si no hay valor local
   useEffect(() => {
     if (autoPick && !value && selectedGlobal && onChange) {
       onChange(selectedGlobal);
     }
-  }, []); // solo al montar
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handle = (v) => {
+  function handle(v) {
     onChange?.(v);
     if (syncGlobal && v) setGlobal(v);
-  };
+  }
+
+  const opciones = useMemo(() => [
+    ...(allowEmpty ? [{ value: '', label: '— Todas —' }] : []),
+    ...semanas.map(s => ({
+      value: s.codigo,
+      label: s.codigo + (s.tiene_festivo ? ' · festivo' : ''),
+    })),
+  ], [semanas, allowEmpty]);
+
+  // Texto a mostrar cuando hay una semana seleccionada
+  const displayValue = useMemo(() => {
+    if (!value) return '';
+    const encontrada = semanas.find(s => s.codigo === value);
+    if (!encontrada) return value;
+    return encontrada.codigo + (encontrada.tiene_festivo ? ' · festivo' : '');
+  }, [value, semanas]);
 
   return (
-    <select
-      value={value || ''}
-      onChange={(e) => handle(e.target.value)}
-      className={`px-3 py-2 border border-gray-300 rounded-lg bg-white ${className}`}
-    >
-      {allowEmpty && <option value="">— Todas —</option>}
-      {!value && !allowEmpty && <option value="" disabled>Selecciona semana…</option>}
-      {semanas.map((s) => (
-        <option key={s.codigo} value={s.codigo}>
-          {s.codigo}{s.tiene_festivo ? ' ·  festivo' : ''}
-        </option>
-      ))}
-    </select>
+    <ComboBox
+      placeholder="Buscar semana…"
+      options={opciones}
+      displayValue={displayValue}
+      onSelect={opt => handle(opt?.value ?? '')}
+      className={className}
+    />
   );
 }

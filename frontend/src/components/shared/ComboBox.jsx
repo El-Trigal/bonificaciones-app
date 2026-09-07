@@ -107,7 +107,11 @@ export default function ComboBox({
             {loading ? (
               <p className="px-4 py-3 text-sm text-gray-400 text-center">Buscando...</p>
             ) : visible.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-gray-400 text-center">Sin resultados</p>
+              <p className="px-4 py-3 text-sm text-gray-400 text-center">
+                {onSearch && query.length < 2
+                  ? 'Escribe al menos 2 caracteres para buscar'
+                  : 'Sin resultados'}
+              </p>
             ) : visible.slice(0, 80).map((opt, i) => (
               <button
                 key={i}

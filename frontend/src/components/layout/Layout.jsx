@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
-import { Building2, ChevronRight, Loader2 } from 'lucide-react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { Building2, ChevronRight, Loader2, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
 import useAuthStore from '../../store/authStore';
 
@@ -32,14 +32,12 @@ function SinSedeScreen() {
         <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto">
           <Building2 size={28} className="text-primary-600" />
         </div>
-
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Selecciona una sede</h2>
           <p className="text-sm text-gray-500 mt-1">
             Tu cuenta tiene acceso a múltiples sedes. Elige con cuál deseas trabajar.
           </p>
         </div>
-
         <div className="space-y-3">
           <select
             value={sedeId}
@@ -51,7 +49,6 @@ function SinSedeScreen() {
               <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
           </select>
-
           <button
             onClick={continuar}
             disabled={!sedeId || loading}
@@ -70,14 +67,44 @@ function SinSedeScreen() {
 
 export default function Layout() {
   const { user } = useAuthStore();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const sinSede = ROLES_MULTISEDE.includes(user?.rol) && !user?.sede_activa_id;
+
+  // Cerrar sidebar al cambiar de página en móvil
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="ml-60 flex-1 flex flex-col">
+      {/* Sidebar */}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      {/* Overlay oscuro en móvil cuando el sidebar está abierto */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Contenido principal */}
+      <div className="flex-1 flex flex-col min-w-0 md:ml-60">
+        {/* Header solo visible en móvil */}
+        <header className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-gray-600 p-1.5 -ml-1 rounded-lg hover:bg-gray-100 touch-manipulation"
+            aria-label="Abrir menú"
+          >
+            <Menu size={22} />
+          </button>
+          <span className="font-semibold text-gray-800 text-sm">Bonificaciones</span>
+        </header>
+
         {sinSede ? <SinSedeScreen /> : (
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>
         )}

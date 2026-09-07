@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Upload, FileText, Search, BarChart3,
   Settings, Users, LogOut, FileCode, Table2, Award,
-  Calendar, History, ChevronDown, Building2,
+  Calendar, ChevronDown, Building2, X,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 
@@ -84,7 +84,7 @@ function SedeSwitcher({ user }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose }) {
   const { user, logout, can } = useAuthStore();
   const navigate = useNavigate();
 
@@ -94,14 +94,28 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-gradient-to-b from-primary-500 to-primary-700 text-white flex flex-col z-50">
+    <aside className={`
+      fixed left-0 top-0 bottom-0 w-60 z-50
+      bg-gradient-to-b from-primary-500 to-primary-700 text-white flex flex-col
+      transition-transform duration-300 ease-in-out
+      ${open ? 'translate-x-0' : '-translate-x-full'}
+      md:translate-x-0
+    `}>
       <div className="p-5 border-b border-primary-400">
         <div className="flex items-center gap-2.5">
           <img src="/brand/icon/espiga-white.png" alt="" className="h-7 w-auto shrink-0" />
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-lg font-bold tracking-tight leading-tight">Bonificaciones</h1>
             <p className="text-primary-300 text-xs">Flores El Trigal &middot; v2.0</p>
           </div>
+          {/* Botón cerrar — solo visible en móvil */}
+          <button
+            onClick={onClose}
+            className="md:hidden text-white/70 hover:text-white p-1 touch-manipulation"
+            aria-label="Cerrar menú"
+          >
+            <X size={20} />
+          </button>
         </div>
         {['SUPER_ADMIN', 'LECTOR_GLOBAL'].includes(user?.rol) && <SedeSwitcher user={user} />}
       </div>
