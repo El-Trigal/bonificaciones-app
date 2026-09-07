@@ -41,6 +41,11 @@ def crear_tablas_nuevas():
     print("      OK")
 
 
+def migrar_sedes():
+    print("[1b] Agregando columnas a 'sedes'...")
+    agregar_columna_si_falta("sedes", "salario_base_default", "REAL DEFAULT 1423500")
+
+
 def migrar_semanas():
     print("[2/5] Agregando columnas a 'semanas'...")
     agregar_columna_si_falta("semanas", "fecha_inicio", "DATE")
@@ -148,6 +153,7 @@ def main():
     print("=" * 60)
     try:
         crear_tablas_nuevas()
+        migrar_sedes()
         migrar_semanas()
         migrar_usuarios_seguridad()
         db = SessionLocal()

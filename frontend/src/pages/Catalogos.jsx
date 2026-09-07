@@ -175,10 +175,14 @@ function TabLabores() {
   const [recomputando, setRecomputando] = useState(false);
   const [seleccionados, setSeleccionados] = useState(new Set());
   const [curvaModal, setCurvaModal] = useState(null);
+  const [salarioDefault, setSalarioDefault] = useState(1423500);
+  const [editandoDefault, setEditandoDefault] = useState(false);
+  const [nuevoDefault, setNuevoDefault] = useState('');
+  const [guardandoDefault, setGuardandoDefault] = useState(false);
 
   const defaults = {
     nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1,
-    salario_base: 1423500, tarifa_he_ordinaria: 7736, tarifa_he_dominical: 12378,
+    salario_base: salarioDefault, tarifa_he_ordinaria: 7736, tarifa_he_dominical: 12378,
     semanas_mes_promedio: 4.33, pct_a_pagar_colaboradores: 0.60,
     pct_cortadores: 0.86, pct_apoyo: 0.14,
   };
@@ -192,8 +196,50 @@ function TabLabores() {
     setLoading(false);
   };
 
+  const cargarConfig = async () => {
+    try {
+      const { data } = await api.get('/catalogos/config-labores');
+      setSalarioDefault(data.salario_base_default);
+    } catch (e) { console.error(e); }
+  };
+
+  const guardarSalarioDefault = async (propagar) => {
+    const nuevo = parseFloat(nuevoDefault);
+    if (!nuevo || nuevo <= 0) { alert('Ingrese un salario válido.'); return; }
+    setGuardandoDefault(true);
+    try {
+      await api.put('/catalogos/config-labores', { salario_base_default: nuevo, propagar });
+      setSalarioDefault(nuevo);
+      setEditandoDefault(false);
+      setNuevoDefault('');
+      if (propagar) cargar();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Error al guardar');
+    } finally {
+      setGuardandoDefault(false);
+    }
+  };
+
+  const confirmarCambioDefault = () => {
+    const nuevo = parseFloat(nuevoDefault);
+    if (!nuevo || nuevo <= 0) { alert('Ingrese un salario válido.'); return; }
+    const activas = labores.filter(l => l.activo).length;
+    const ok = confirm(
+      `Cambiar el salario base por defecto a $${nuevo.toLocaleString('es-CO')}.\n\n` +
+      `Si elige "Propagar a todas las labores", se actualizará el salario base ` +
+      `de ${activas} labor${activas !== 1 ? 'es' : ''} activa${activas !== 1 ? 's' : ''} ` +
+      `y se recalcularán automáticamente sus valores derivados ` +
+      `(costo estándar, valor por unidad). Esto afecta liquidaciones futuras.\n\n` +
+      `¿Desea propagar el cambio a todas las labores activas?\n\n` +
+      `Aceptar = Propagar a todas las labores\n` +
+      `Cancelar = Solo guardar el nuevo valor por defecto (sin cambiar labores existentes)`
+    );
+    guardarSalarioDefault(ok);
+  };
+
   useEffect(() => {
     cargar();
+    cargarConfig();
     api.get('/catalogos/lideres').then(({ data }) => setLideres(data)).catch(() => setLideres([]));
   }, []);
 
@@ -290,6 +336,45 @@ function TabLabores() {
         </div>
       </div>
 
+      {/* Panel salario base por defecto */}
+      <div className="mb-4 p-4 bg-gray-50 border rounded-lg flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-gray-700">Salario base por defecto:</span>
+        {editandoDefault ? (
+          <>
+            <input
+              type="number" step="100" autoFocus
+              value={nuevoDefault}
+              onChange={e => setNuevoDefault(e.target.value)}
+              className="border rounded-lg px-3 py-1.5 text-sm w-40"
+              placeholder={salarioDefault}
+            />
+            <button
+              onClick={confirmarCambioDefault}
+              disabled={guardandoDefault}
+              className="px-3 py-1.5 bg-primary-700 text-white text-sm rounded-lg hover:bg-primary-800 disabled:opacity-50">
+              {guardandoDefault ? 'Guardando...' : 'Guardar'}
+            </button>
+            <button
+              onClick={() => { setEditandoDefault(false); setNuevoDefault(''); }}
+              className="px-3 py-1.5 border text-sm rounded-lg hover:bg-gray-100">
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="font-mono font-semibold text-gray-800">
+              ${salarioDefault.toLocaleString('es-CO')}
+            </span>
+            <button
+              onClick={() => { setNuevoDefault(salarioDefault); setEditandoDefault(true); }}
+              className="px-3 py-1.5 border text-sm rounded-lg hover:bg-gray-100 flex items-center gap-1">
+              <Pencil size={13} /> Cambiar
+            </button>
+            <span className="text-xs text-gray-400">Se pre-llena al crear una nueva labor. Al cambiar, puedes propagarlo a todas las labores activas.</span>
+          </>
+        )}
+      </div>
+
       {loading ? <LoadingSpinner /> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -302,7 +387,7 @@ function TabLabores() {
                 </th>
                 <th className="text-left p-2">Labor</th>
                 <th className="text-left p-2">Líder</th>
-                <th className="text-right p-2">Rend. Mín/h</th>
+                <th className="text-right p-2">Rend. Unidades/hora</th>
                 <th className="text-right p-2">Tallos/Ramo</th>
                 <th className="text-right p-2">% Pagar</th>
                 <th className="text-right p-2">Val. Unid. Colab.</th>

@@ -9,7 +9,7 @@ from typing import Optional, List
 from database import get_db
 from models import (
     Empleado, Lider, ProductoArea, Semana, LaborRendimiento, TipoBonificacion, Usuario,
-    ConfigCurvaCalidad,
+    ConfigCurvaCalidad, Sede,
 )
 from schemas import (
     EmpleadoCreate, EmpleadoUpdate, EmpleadoOut,
@@ -19,6 +19,7 @@ from schemas import (
     LaborRendimientoCreate, LaborRendimientoUpdate, LaborRendimientoOut,
     TipoBonificacionCreate, TipoBonificacionOut,
     CurvaCalidadOut, GuardarCurvaIn, GuardarCurvaBulkIn, ReglaCalidadOut,
+    ConfigLaboresOut, ConfigLaboresIn,
 )
 from services.calculador import CURVA_CALIDAD_DEFAULT
 from services.auth import get_current_user, get_sede_activa, requiere_permiso
@@ -289,6 +290,37 @@ async def confirmar_empleados_excel(
 
 
 # ─── Labores de Rendimiento ───────────────────────────────
+@router.get("/config-labores", response_model=ConfigLaboresOut)
+def get_config_labores(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    return {"salario_base_default": sede.salario_base_default or 1423500}
+
+
+@router.put("/config-labores", response_model=ConfigLaboresOut)
+def set_config_labores(
+    data: ConfigLaboresIn,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
+):
+    sede_id = get_sede_activa(user)
+    sede = db.query(Sede).filter_by(id=sede_id).first()
+    sede.salario_base_default = data.salario_base_default
+    db.commit()
+
+    if data.propagar:
+        labores = db.query(LaborRendimiento).filter_by(sede_id=sede_id, activo=True).all()
+        for labor in labores:
+            labor.salario_base = data.salario_base_default
+            labor.recalcular_valores()
+        db.commit()
+
+    return {"salario_base_default": sede.salario_base_default}
+
+
 @router.get("/labores-rendimiento", response_model=List[LaborRendimientoOut])
 def listar_labores(
     activo: Optional[bool] = None,

@@ -17,6 +17,7 @@ class Sede(Base):
     nombre = Column(Text, unique=True, nullable=False)
     codigo = Column(Text, unique=True, nullable=False)  # MAN | CAR | OLA | AGC
     activo = Column(Boolean, default=True)
+    salario_base_default = Column(Float, default=1423500)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     usuarios = relationship("Usuario", back_populates="sede")

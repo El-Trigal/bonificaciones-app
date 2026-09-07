@@ -114,6 +114,15 @@ class LaborRendimientoOut(LaborRendimientoBase):
     model_config = {"from_attributes": True}
 
 
+# ─── Config Labores ─────────────────────────────────────
+class ConfigLaboresOut(BaseModel):
+    salario_base_default: float
+
+class ConfigLaboresIn(BaseModel):
+    salario_base_default: float
+    propagar: bool = False
+
+
 # ─── Curva de Calidad ───────────────────────────────────
 class ReglaCalidadIn(BaseModel):
     pct_calidad: int = Field(..., ge=0, le=100)
