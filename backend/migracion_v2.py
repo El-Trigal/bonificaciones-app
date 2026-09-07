@@ -62,7 +62,7 @@ def migrar_semanas_diarias():
     for col in ["horas_lun", "horas_mar", "horas_mie", "horas_jue", "horas_vie", "horas_sab", "horas_dom"]:
         agregar_columna_si_falta("semanas", col, "REAL")
     agregar_columna_si_falta("semanas", "festivos_dias", "TEXT")
-    agregar_columna_si_falta("semanas", "modificacion_manual", "BOOLEAN DEFAULT 0")
+    agregar_columna_si_falta("semanas", "modificacion_manual", "BOOLEAN DEFAULT FALSE")
 
 
 def migrar_semanas():
