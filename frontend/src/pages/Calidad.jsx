@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, Trash2, Upload, Calculator, Eye, User, Wrench, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Upload, Calculator, Eye, User, Wrench, AlertTriangle } from 'lucide-react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import ComboBox from '../components/shared/ComboBox';
@@ -33,6 +33,13 @@ export default function Calidad() {
       .then(r => setLabores(r.data))
       .catch(() => {});
   }, []);
+
+  // ─── Auto-buscar al cambiar semana ───────────────────────────────────────
+
+  useEffect(() => {
+    if (semana) buscar();
+    else setItems([]);
+  }, [semana]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const laborOpciones = useMemo(() =>
     labores.map(l => ({
@@ -178,13 +185,13 @@ export default function Calidad() {
           <label className="block text-sm font-medium text-gray-700 mb-1">Semana</label>
           <SemanaSelect value={semana} onChange={setSemana} className="w-full"/>
         </div>
-        <button onClick={buscar} disabled={loading} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark disabled:opacity-50">
-          <Search size={16}/> Buscar
-        </button>
+        {loading && (
+          <span className="text-sm text-gray-400 self-center">Cargando...</span>
+        )}
         <button
           onClick={abrirModal}
           disabled={!semana}
-          className="flex items-center gap-2 bg-white border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary-50 disabled:opacity-50"
+          className="flex items-center gap-2 bg-white border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary-50 disabled:opacity-50 ml-auto"
         >
           <Plus size={16}/> Nuevo
         </button>

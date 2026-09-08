@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Search, Save, Trash2, Plus, AlertTriangle, CalendarDays, User, Wrench } from 'lucide-react';
+import { Save, Trash2, Plus, AlertTriangle, CalendarDays, User, Wrench } from 'lucide-react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 import SemanaSelect from '../components/shared/SemanaSelect';
@@ -88,6 +88,13 @@ export default function RegistrosDiarios() {
       .then(r => setLideres(r.data))
       .catch(() => {});
   }, []);
+
+  // ─── Auto-buscar al cambiar semana ───────────────────────────────────────
+
+  useEffect(() => {
+    if (semana) buscar();
+    else { setRegistros([]); setEditando({}); }
+  }, [semana]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Opciones de selectores ───────────────────────────────────────────────
 
@@ -360,14 +367,9 @@ export default function RegistrosDiarios() {
           <label className="block text-sm font-medium text-gray-700 mb-1">Semana</label>
           <SemanaSelect value={semana} onChange={setSemana} className="w-full" />
         </div>
-        <button
-          onClick={buscar}
-          disabled={loading || !semana}
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl
-                     hover:bg-primary-dark disabled:opacity-40 font-medium touch-manipulation"
-        >
-          <Search size={16} /> {loading ? 'Buscando...' : 'Buscar'}
-        </button>
+        {loading && (
+          <span className="text-sm text-gray-400 self-center">Cargando...</span>
+        )}
         <div className="text-sm text-gray-500 ml-auto self-center">
           {registrosFiltrados.length} de {registros.length} registros
           {hayFiltros && (
