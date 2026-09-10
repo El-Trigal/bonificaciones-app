@@ -14,6 +14,7 @@ export default function CargaDatos() {
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
   const [erroresExpandidos, setErroresExpandidos] = useState(false);
+  const [advertenciasExpandidas, setAdvertenciasExpandidas] = useState(false);
   const fileRef = useRef();
 
   useEffect(() => {
@@ -29,8 +30,12 @@ export default function CargaDatos() {
     setResultado(null);
     setError('');
     setErroresExpandidos(false);
+    setAdvertenciasExpandidas(false);
     if (fileRef.current) fileRef.current.value = '';
   }
+
+  const plantillaSel = plantillas.find((p) => p.id === parseInt(plantillaId));
+  const esSemanal = plantillaSel?.tipo === 'RENDIMIENTO_SEMANAL';
 
   async function hacerPreview() {
     setError('');
@@ -43,7 +48,10 @@ export default function CargaDatos() {
       const fd = new FormData();
       fd.append('plantilla_id', plantillaId);
       fd.append('archivo', archivo);
-      const { data } = await api.post('/registros-diarios/preview', fd, {
+      const endpoint = esSemanal
+        ? '/registros-diarios/preview-semanal'
+        : '/registros-diarios/preview';
+      const { data } = await api.post(endpoint, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setPreview(data);
@@ -58,11 +66,23 @@ export default function CargaDatos() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/registros-diarios/confirmar', {
-        plantilla_id: parseInt(plantillaId),
-        archivo: preview.archivo,
-        registros: preview.registros,
-      });
+      let data;
+      if (esSemanal) {
+        const res = await api.post('/registros-diarios/confirmar-semanal', {
+          plantilla_id: parseInt(plantillaId),
+          archivo: preview.archivo,
+          registros_diarios: preview.registros_diarios,
+          registros_calidad: preview.registros_calidad,
+        });
+        data = res.data;
+      } else {
+        const res = await api.post('/registros-diarios/confirmar', {
+          plantilla_id: parseInt(plantillaId),
+          archivo: preview.archivo,
+          registros: preview.registros,
+        });
+        data = res.data;
+      }
       setResultado(data);
       setPreview(null);
     } catch (err) {
@@ -72,9 +92,17 @@ export default function CargaDatos() {
     }
   }
 
-  const plantillaSel = plantillas.find((p) => p.id === parseInt(plantillaId));
-  const hayErrores = preview?.errores?.length > 0;
-  const hayRegistros = preview?.registros_ok > 0;
+  // Para el flujo semanal: FESTIVO_HORAS_ORD se muestra pero NO bloquea (el parser ya corrigió h_ord=0)
+  const erroresSemanal = preview?.errores ?? [];
+  const erroresBloqueo = esSemanal
+    ? erroresSemanal.filter((e) => e.tipo !== 'FESTIVO_HORAS_ORD')
+    : erroresSemanal;
+  const advertencias = preview?.advertencias ?? [];
+
+  const hayErroresBloqueo = erroresBloqueo.length > 0;
+  const hayRegistros = esSemanal
+    ? (preview?.registros_ok ?? 0) > 0
+    : (preview?.registros_ok ?? 0) > 0;
 
   return (
     <div className="max-w-3xl">
@@ -92,14 +120,23 @@ export default function CargaDatos() {
               Carga confirmada <span className="text-gray-400 font-normal text-sm">(#{resultado.carga_id})</span>
             </h3>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard label="Insertados"   value={resultado.insertados}            color="green" />
-            <StatCard label="Actualizados" value={resultado.actualizados}          color="blue"  />
-            <StatCard label="Errores"      value={resultado.errores?.length ?? 0}  color={resultado.errores?.length ? 'red' : 'gray'} />
-          </div>
+          {esSemanal ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="Reg. insertados"   value={resultado.insertados}            color="green" />
+              <StatCard label="Reg. actualizados" value={resultado.actualizados}          color="blue"  />
+              <StatCard label="Calidad nuevos"     value={resultado.calidad_insertados}   color="green" />
+              <StatCard label="Calidad actualizados" value={resultado.calidad_actualizados} color="blue" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Insertados"   value={resultado.insertados}            color="green" />
+              <StatCard label="Actualizados" value={resultado.actualizados}          color="blue"  />
+              <StatCard label="Errores"      value={resultado.errores?.length ?? 0}  color={resultado.errores?.length ? 'red' : 'gray'} />
+            </div>
+          )}
           {resultado.errores?.length > 0 && (
             <ul className="text-xs text-red-600 font-mono space-y-1 bg-red-50 rounded-xl px-4 py-3 max-h-36 overflow-y-auto">
-              {resultado.errores.map((e, i) => <li key={i}>{e}</li>)}
+              {resultado.errores.map((e, i) => <li key={i}>{JSON.stringify(e)}</li>)}
             </ul>
           )}
           <button
@@ -121,10 +158,13 @@ export default function CargaDatos() {
               <Info size={15} /> Formato aceptado
             </div>
             <p className="text-xs text-blue-600">
-              Archivos <span className="font-mono font-semibold">.xlsx</span>,{' '}
-              <span className="font-mono font-semibold">.xls</span> o{' '}
-              <span className="font-mono font-semibold">.csv</span>.
-              Las columnas requeridas dependen de la plantilla seleccionada.
+              {esSemanal
+                ? 'Reporte semanal de rendimiento en formato Excel (.xlsx). Las columnas se leen por posición fija.'
+                : <>Archivos <span className="font-mono font-semibold">.xlsx</span>,{' '}
+                   <span className="font-mono font-semibold">.xls</span> o{' '}
+                   <span className="font-mono font-semibold">.csv</span>.
+                   Las columnas requeridas dependen de la plantilla seleccionada.</>
+              }
             </p>
           </div>
 
@@ -166,13 +206,15 @@ export default function CargaDatos() {
                   ) : (
                     <div>
                       <p className="text-sm text-gray-500">Haz clic para seleccionar un archivo</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Formatos: .xlsx, .xls, .csv</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {esSemanal ? 'Formato: .xlsx' : 'Formatos: .xlsx, .xls, .csv'}
+                      </p>
                     </div>
                   )}
                   <input
                     ref={fileRef}
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept={esSemanal ? '.xlsx' : '.xlsx,.xls,.csv'}
                     onChange={(e) => { setArchivo(e.target.files?.[0] || null); setPreview(null); }}
                     className="hidden"
                   />
@@ -203,15 +245,51 @@ export default function CargaDatos() {
                   {archivo?.name}
                 </div>
 
-                {/* Resumen */}
-                <div className="grid grid-cols-3 gap-3">
-                  <StatCard label="Total filas"    value={preview.total_filas}      color="gray"  />
-                  <StatCard label="Registros OK"   value={preview.registros_ok}     color="green" />
-                  <StatCard label="Errores"        value={preview.errores?.length ?? 0} color={hayErrores ? 'red' : 'gray'} />
-                </div>
+                {/* Resumen estadísticas */}
+                {esSemanal ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    <StatCard label="Filas Excel"       value={preview.total_filas_excel}  color="gray"  />
+                    <StatCard label="Reg. diarios"      value={preview.registros_ok}       color="green" />
+                    <StatCard label="% Calidad"         value={preview.calidad_ok}         color="blue"  />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    <StatCard label="Total filas"  value={preview.total_filas}          color="gray"  />
+                    <StatCard label="Registros OK" value={preview.registros_ok}         color="green" />
+                    <StatCard label="Errores"      value={preview.errores?.length ?? 0} color={preview.errores?.length ? 'red' : 'gray'} />
+                  </div>
+                )}
 
-                {/* Errores expandibles */}
-                {hayErrores && (
+                {/* Advertencias (fuzzy labor / festivos) */}
+                {esSemanal && advertencias.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-amber-700"
+                      onClick={() => setAdvertenciasExpandidas(!advertenciasExpandidas)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <AlertTriangle size={15} />
+                        {advertencias.length} {advertencias.length === 1 ? 'advertencia' : 'advertencias'} (no bloqueantes)
+                      </span>
+                      {advertenciasExpandidas ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </button>
+                    {advertenciasExpandidas && (
+                      <ul className="px-4 pb-3 space-y-1 max-h-48 overflow-y-auto">
+                        {advertencias.slice(0, 100).map((a, i) => (
+                          <li key={i} className="text-xs text-amber-700 font-mono">
+                            Fila {a.fila} {a.colaborador ? `(${a.colaborador})` : ''}: {a.mensaje}
+                          </li>
+                        ))}
+                        {advertencias.length > 100 && (
+                          <li className="text-xs text-amber-500">…y {advertencias.length - 100} más</li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Errores */}
+                {erroresSemanal.length > 0 && (
                   <div className="rounded-xl border border-red-100 bg-red-50 overflow-hidden">
                     <button
                       className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-red-700"
@@ -219,19 +297,25 @@ export default function CargaDatos() {
                     >
                       <span className="flex items-center gap-2">
                         <XCircle size={15} />
-                        {preview.errores.length} {preview.errores.length === 1 ? 'error' : 'errores'} encontrados
+                        {erroresSemanal.length} {erroresSemanal.length === 1 ? 'error' : 'errores'} encontrados
+                        {esSemanal && erroresBloqueo.length < erroresSemanal.length && (
+                          <span className="text-xs font-normal text-red-500 ml-1">
+                            ({erroresSemanal.length - erroresBloqueo.length} corregidos automáticamente)
+                          </span>
+                        )}
                       </span>
                       {erroresExpandidos ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </button>
                     {erroresExpandidos && (
-                      <ul className="px-4 pb-3 space-y-1 max-h-40 overflow-y-auto">
-                        {preview.errores.slice(0, 50).map((e, i) => (
-                          <li key={i} className="text-xs text-red-600 font-mono">
-                            Fila {e.fila}: {e.error}
+                      <ul className="px-4 pb-3 space-y-1 max-h-48 overflow-y-auto">
+                        {erroresSemanal.slice(0, 100).map((e, i) => (
+                          <li key={i} className={`text-xs font-mono ${e.tipo === 'FESTIVO_HORAS_ORD' ? 'text-amber-600' : 'text-red-600'}`}>
+                            {e.fila ? `Fila ${e.fila}` : ''}{e.colaborador ? ` (${e.colaborador})` : ''}{e.fila || e.colaborador ? ': ' : ''}{e.mensaje || e.error}
+                            {e.tipo === 'FESTIVO_HORAS_ORD' && <span className="ml-1 text-amber-500">[corregido]</span>}
                           </li>
                         ))}
-                        {preview.errores.length > 50 && (
-                          <li className="text-xs text-red-400">…y {preview.errores.length - 50} más</li>
+                        {erroresSemanal.length > 100 && (
+                          <li className="text-xs text-red-400">…y {erroresSemanal.length - 100} más</li>
                         )}
                       </ul>
                     )}
@@ -245,30 +329,58 @@ export default function CargaDatos() {
                       Vista previa · {preview.preview.length} de {preview.registros_ok} registros
                     </div>
                     <div className="overflow-x-auto max-h-72">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-100 sticky top-0">
-                          <tr>
-                            {['Fecha','Semana','Código','Nombre','Labor','Líder','Tallos','Ramos','H.ord'].map(h => (
-                              <th key={h} className="px-2 py-1.5 text-left font-medium text-gray-600 whitespace-nowrap">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {preview.preview.map((r, i) => (
-                            <tr key={i} className="hover:bg-gray-50">
-                              <td className="px-2 py-1">{r.fecha}</td>
-                              <td className="px-2 py-1 font-mono">{r.semana}</td>
-                              <td className="px-2 py-1 font-mono">{r.codigo_colaborador}</td>
-                              <td className="px-2 py-1">{r.nombre_colaborador}</td>
-                              <td className="px-2 py-1">{r.labor}</td>
-                              <td className="px-2 py-1">{r.lider}</td>
-                              <td className="px-2 py-1 text-right">{r.tallos}</td>
-                              <td className="px-2 py-1 text-right">{r.ramos}</td>
-                              <td className="px-2 py-1 text-right">{r.horas_ordinarias}</td>
+                      {esSemanal ? (
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              {['Fecha','Día','Semana','Código','Nombre','Labor','Ramos','H.ord','H.extra','H.dom'].map(h => (
+                                <th key={h} className="px-2 py-1.5 text-left font-medium text-gray-600 whitespace-nowrap">{h}</th>
+                              ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {preview.preview.map((r, i) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-2 py-1">{r.fecha}</td>
+                                <td className="px-2 py-1 font-mono">{r.dia}</td>
+                                <td className="px-2 py-1 font-mono">{r.semana}</td>
+                                <td className="px-2 py-1 font-mono">{r.codigo_colaborador}</td>
+                                <td className="px-2 py-1">{r.nombre_colaborador}</td>
+                                <td className="px-2 py-1">{r.labor}</td>
+                                <td className="px-2 py-1 text-right">{r.ramos}</td>
+                                <td className="px-2 py-1 text-right">{r.horas_ordinarias}</td>
+                                <td className="px-2 py-1 text-right">{r.horas_extra_ordinarias}</td>
+                                <td className="px-2 py-1 text-right">{r.horas_dominicales}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              {['Fecha','Semana','Código','Nombre','Labor','Líder','Tallos','Ramos','H.ord'].map(h => (
+                                <th key={h} className="px-2 py-1.5 text-left font-medium text-gray-600 whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {preview.preview.map((r, i) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-2 py-1">{r.fecha}</td>
+                                <td className="px-2 py-1 font-mono">{r.semana}</td>
+                                <td className="px-2 py-1 font-mono">{r.codigo_colaborador}</td>
+                                <td className="px-2 py-1">{r.nombre_colaborador}</td>
+                                <td className="px-2 py-1">{r.labor}</td>
+                                <td className="px-2 py-1">{r.lider}</td>
+                                <td className="px-2 py-1 text-right">{r.tallos}</td>
+                                <td className="px-2 py-1 text-right">{r.ramos}</td>
+                                <td className="px-2 py-1 text-right">{r.horas_ordinarias}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </div>
                 )}
@@ -285,15 +397,13 @@ export default function CargaDatos() {
           {/* Footer de acciones */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50">
             {!preview && (
-              <>
-                <button
-                  onClick={hacerPreview}
-                  disabled={loading || !plantillaId || !archivo}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:bg-primary-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Analizar archivo <ArrowRight size={15} />
-                </button>
-              </>
+              <button
+                onClick={hacerPreview}
+                disabled={loading || !plantillaId || !archivo}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:bg-primary-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Analizar archivo <ArrowRight size={15} />
+              </button>
             )}
             {preview && !loading && (
               <>
@@ -302,7 +412,7 @@ export default function CargaDatos() {
                 </button>
                 <button
                   onClick={confirmar}
-                  disabled={!hayRegistros}
+                  disabled={!hayRegistros || hayErroresBloqueo}
                   className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:bg-primary-800 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <CheckCircle2 size={15} /> Confirmar ({preview.registros_ok} registros)

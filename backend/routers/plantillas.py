@@ -13,7 +13,7 @@ from services.auth import requiere_permiso
 
 router = APIRouter(prefix="/api/plantillas", tags=["Plantillas"])
 
-TIPOS_VALIDOS = {"RENDIMIENTO_DIARIO", "CALIDAD", "HE_DOMINICAL"}
+TIPOS_VALIDOS = {"RENDIMIENTO_DIARIO", "CALIDAD", "HE_DOMINICAL", "RENDIMIENTO_SEMANAL"}
 UNIDADES_VALIDAS = {"TALLOS", "RAMOS"}
 
 
@@ -55,6 +55,8 @@ def _validar(data: PlantillaIn):
         raise HTTPException(400, f"Tipo inválido. Válidos: {sorted(TIPOS_VALIDOS)}")
     if data.unidad_origen not in UNIDADES_VALIDAS:
         raise HTTPException(400, f"unidad_origen inválida. Válidos: {sorted(UNIDADES_VALIDAS)}")
+    if data.tipo == "RENDIMIENTO_SEMANAL":
+        return  # formato de columnas fijo; no requiere config JSON
     cols = (data.configuracion or {}).get("columnas") or {}
     obligatorias = {"codigo_colaborador", "nombre_colaborador", "fecha"}
     faltan = obligatorias - set(cols.keys())

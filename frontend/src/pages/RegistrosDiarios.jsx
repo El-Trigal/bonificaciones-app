@@ -299,16 +299,13 @@ export default function RegistrosDiarios() {
 
   async function guardarYOtro() {
     if (!await crearRegistro()) return;
-    // Conservar fecha, labor y lider — solo limpiar colaborador y valores
+    // Conservar fecha, colaborador, labor y lider — solo limpiar valores numéricos
     setNuevo(prev => ({
       ...prev,
-      codigo_colaborador: '', nombre_colaborador: '',
       tallos: '', ramos: '', horas_ordinarias: '',
       horas_extra_ordinarias: '', horas_dominicales: '',
       unidades_tarea: '', horas_tarea: '',
     }));
-    setEmpleadosOpts([]);
-    setComboKey(k => k + 1); // resetea el combobox de empleado
     setModalError('');
   }
 

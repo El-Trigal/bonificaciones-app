@@ -386,20 +386,34 @@ function PasoDetalle({ paso }) {
 
   // Paso 3: Calidad - check + multiplier
   if (num === 3) {
+    const cumple = d.cumple_minimo_81pct;
+    const mult   = d.multiplicador_calidad;
+    const pleno  = mult >= 1.0;
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="font-medium">Cumple calidad:</span>
-          {d.cumple ? (
+          <span className="font-medium">Cumple mínimo calidad (81%):</span>
+          {cumple ? (
             <span className="flex items-center gap-1 text-primary-600"><CheckCircle className="w-4 h-4" /> Sí</span>
           ) : (
             <span className="flex items-center gap-1 text-red-600"><XCircle className="w-4 h-4" /> No</span>
           )}
         </div>
-        {d.multiplicador !== undefined && (
-          <p><span className="font-medium">Multiplicador:</span> {d.multiplicador}</p>
+        {mult !== undefined && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium">Multiplicador calidad:</span>
+            <span className={`font-bold ${pleno ? 'text-primary-600' : 'text-amber-600'}`}>
+              {(mult * 100).toFixed(0)}%
+            </span>
+            {cumple && !pleno && (
+              <span className="text-xs text-amber-600">(parcial — calidad &lt; 90%)</span>
+            )}
+            {pleno && (
+              <span className="text-xs text-primary-600">(pleno — calidad ≥ 90%)</span>
+            )}
+          </div>
         )}
-        {renderKeyValue(d, ['cumple', 'multiplicador'])}
+        {renderKeyValue(d, ['cumple_minimo_81pct', 'multiplicador_calidad'])}
       </div>
     );
   }

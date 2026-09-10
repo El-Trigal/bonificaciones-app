@@ -3,7 +3,7 @@ import { Plus, Edit2, Trash2, FileCode } from 'lucide-react';
 import api from '../store/api';
 import Modal from '../components/shared/Modal';
 
-const TIPOS = ['RENDIMIENTO_DIARIO', 'CALIDAD', 'HE_DOMINICAL'];
+const TIPOS = ['RENDIMIENTO_DIARIO', 'CALIDAD', 'HE_DOMINICAL', 'RENDIMIENTO_SEMANAL'];
 const UNIDADES = ['TALLOS', 'RAMOS'];
 
 const CONFIG_EJEMPLO = {
@@ -66,8 +66,12 @@ export default function Plantillas() {
   async function guardar() {
     setError('');
     let cfg;
-    try { cfg = JSON.parse(configText); }
-    catch { setError('JSON de configuración inválido'); return; }
+    if (form.tipo === 'RENDIMIENTO_SEMANAL') {
+      cfg = {};
+    } else {
+      try { cfg = JSON.parse(configText); }
+      catch { setError('JSON de configuración inválido'); return; }
+    }
     setSaving(true);
     try {
       const body = { ...form, configuracion: cfg };
@@ -169,20 +173,27 @@ export default function Plantillas() {
               <input type="checkbox" checked={!!form.activo} onChange={(e) => setForm({...form, activo: e.target.checked})}/>
               Plantilla activa
             </label>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Configuración (JSON)</label>
-              <textarea
-                value={configText}
-                onChange={(e) => setConfigText(e.target.value)}
-                rows={14}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs"
-                spellCheck="false"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Campos obligatorios: <code>codigo_colaborador</code>, <code>nombre_colaborador</code>, <code>fecha</code>.
-                Requiere <code>labor</code> en columnas o <code>labor_fija</code>.
-              </p>
-            </div>
+            {form.tipo === 'RENDIMIENTO_SEMANAL' ? (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
+                Las plantillas de tipo <strong>RENDIMIENTO_SEMANAL</strong> usan columnas de posición fija del reporte semanal.
+                No requieren configuración JSON.
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Configuración (JSON)</label>
+                <textarea
+                  value={configText}
+                  onChange={(e) => setConfigText(e.target.value)}
+                  rows={14}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs"
+                  spellCheck="false"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Campos obligatorios: <code>codigo_colaborador</code>, <code>nombre_colaborador</code>, <code>fecha</code>.
+                  Requiere <code>labor</code> en columnas o <code>labor_fija</code>.
+                </p>
+              </div>
+            )}
             <div className="flex gap-2 pt-2">
               <button onClick={() => setModal(null)} className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
               <button onClick={guardar} disabled={saving} className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark disabled:opacity-50">

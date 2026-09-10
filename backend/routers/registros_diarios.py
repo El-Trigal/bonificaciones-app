@@ -9,9 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import CargaCsv, LaborRendimiento, PlantillaCarga, RegistroDiario, Usuario
+from models import CargaCsv, LaborRendimiento, PlantillaCarga, RegistroCalidad, RegistroDiario, Usuario
 from services.auth import get_sede_activa, requiere_permiso
 from services.parser_generico import parsear
+from services.parser_semanal import parsear_semanal
 from services.utils_semana import normalizar_codigo_semana, semana_desde_fecha, festivos_colombia
 
 router = APIRouter(prefix="/api/registros-diarios", tags=["Registros Diarios"])
@@ -181,6 +182,161 @@ def confirmar_carga(
         "insertados": insertados,
         "actualizados": actualizados,
         "errores": errores,
+    }
+
+
+@router.post("/preview-semanal")
+def preview_semanal(
+    plantilla_id: int = Form(...),
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("cargar_archivos")),
+):
+    sede_id = get_sede_activa(user)
+    plantilla = db.query(PlantillaCarga).filter_by(id=plantilla_id, sede_id=sede_id).first()
+    if not plantilla:
+        raise HTTPException(404, "Plantilla no encontrada")
+    if plantilla.tipo != "RENDIMIENTO_SEMANAL":
+        raise HTTPException(400, "Esta plantilla no es de tipo RENDIMIENTO_SEMANAL")
+
+    labores = db.query(LaborRendimiento).filter_by(sede_id=sede_id, activo=True).all()
+    labores_catalogo = [l.nombre for l in labores]
+
+    contenido = archivo.file.read()
+    res = parsear_semanal(contenido, archivo.filename, labores_catalogo)
+
+    for r in res["registros_diarios"]:
+        r["lider"] = _lider_por_labor(db, r["labor"], sede_id)
+
+    return {
+        "archivo": archivo.filename,
+        "plantilla": plantilla.nombre,
+        "total_filas_excel": res["total_filas_excel"],
+        "registros_diarios": res["registros_diarios"],
+        "registros_calidad": res["registros_calidad"],
+        "errores": res["errores"],
+        "advertencias": res["advertencias"],
+        "registros_ok": len(res["registros_diarios"]),
+        "calidad_ok": len(res["registros_calidad"]),
+        "preview": res["registros_diarios"][:200],
+    }
+
+
+class ConfirmarSemanalIn(BaseModel):
+    plantilla_id: int
+    archivo: str
+    registros_diarios: list[dict]
+    registros_calidad: list[dict]
+
+
+@router.post("/confirmar-semanal")
+def confirmar_semanal(
+    data: ConfirmarSemanalIn,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(requiere_permiso("cargar_archivos")),
+):
+    sede_id = get_sede_activa(user)
+    plantilla = db.query(PlantillaCarga).filter_by(id=data.plantilla_id, sede_id=sede_id).first()
+    if not plantilla:
+        raise HTTPException(404, "Plantilla no encontrada")
+
+    carga = CargaCsv(
+        sede_id=sede_id,
+        nombre_archivo=data.archivo,
+        tipo=plantilla.tipo,
+        cargado_por=user.username,
+        total_filas=len(data.registros_diarios),
+        filas_ok=0,
+        filas_error=0,
+    )
+    db.add(carga)
+    db.flush()
+
+    insertados = actualizados = 0
+    calidad_insertados = calidad_actualizados = 0
+    errores_bd = []
+
+    pendientes: dict[tuple, RegistroDiario] = {}
+    for idx, r in enumerate(data.registros_diarios):
+        try:
+            fecha = date.fromisoformat(r["fecha"]) if isinstance(r["fecha"], str) else r["fecha"]
+            clave = (fecha, int(r["codigo_colaborador"]), r["labor"])
+            existente = pendientes.get(clave) or db.query(RegistroDiario).filter_by(
+                sede_id=sede_id,
+                fecha=fecha,
+                codigo_colaborador=int(r["codigo_colaborador"]),
+                labor=r["labor"],
+            ).first()
+            campos = dict(
+                sede_id=sede_id,
+                carga_id=carga.id,
+                fecha=fecha,
+                semana=r.get("semana") or semana_desde_fecha(fecha),
+                codigo_colaborador=int(r["codigo_colaborador"]),
+                nombre_colaborador=r["nombre_colaborador"],
+                labor=r["labor"],
+                lider=r.get("lider") or _lider_por_labor(db, r["labor"], sede_id),
+                tallos=float(r.get("tallos", 0) or 0),
+                ramos=float(r.get("ramos", 0) or 0),
+                horas_ordinarias=float(r.get("horas_ordinarias", 0) or 0),
+                horas_extra_ordinarias=float(r.get("horas_extra_ordinarias", 0) or 0),
+                horas_dominicales=float(r.get("horas_dominicales", 0) or 0),
+                unidades_tarea=float(r.get("unidades_tarea", 0) or 0),
+                horas_tarea=float(r.get("horas_tarea", 0) or 0),
+                origen="CARGA",
+            )
+            if existente:
+                for k, v in campos.items():
+                    setattr(existente, k, v)
+                if clave not in pendientes:
+                    actualizados += 1
+                pendientes[clave] = existente
+            else:
+                nuevo = RegistroDiario(**campos)
+                db.add(nuevo)
+                pendientes[clave] = nuevo
+                insertados += 1
+        except Exception as e:
+            errores_bd.append({"indice": idx, "error": str(e)})
+
+    for rc in data.registros_calidad:
+        try:
+            existente_cal = db.query(RegistroCalidad).filter_by(
+                sede_id=sede_id,
+                semana=rc["semana"],
+                codigo_colaborador=int(rc["codigo_colaborador"]),
+                labor=rc["labor"],
+            ).first()
+            if existente_cal:
+                existente_cal.pct_calidad = float(rc["pct_calidad"])
+                existente_cal.origen = "CARGA"
+                calidad_actualizados += 1
+            else:
+                nuevo_cal = RegistroCalidad(
+                    sede_id=sede_id,
+                    semana=rc["semana"],
+                    codigo_colaborador=int(rc["codigo_colaborador"]),
+                    labor=rc["labor"],
+                    pct_calidad=float(rc["pct_calidad"]),
+                    origen="CARGA",
+                )
+                db.add(nuevo_cal)
+                calidad_insertados += 1
+        except Exception as e:
+            errores_bd.append({"tipo": "calidad", "error": str(e), "registro": str(rc)[:100]})
+
+    carga.filas_ok = insertados + actualizados
+    carga.filas_error = len(errores_bd)
+    if errores_bd:
+        carga.detalle_errores = json.dumps(errores_bd, ensure_ascii=False)
+    db.commit()
+    return {
+        "carga_id": carga.id,
+        "insertados": insertados,
+        "actualizados": actualizados,
+        "calidad_insertados": calidad_insertados,
+        "calidad_actualizados": calidad_actualizados,
+        "errores": errores_bd,
     }
 
 
