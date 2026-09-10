@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import PlantillaCarga, Usuario
-from services.auth import requiere_permiso
+from services.auth import get_sede_activa, requiere_permiso
 
 router = APIRouter(prefix="/api/plantillas", tags=["Plantillas"])
 
@@ -70,9 +70,10 @@ def _validar(data: PlantillaIn):
 def listar(
     tipo: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(requiere_permiso("editar_catalogos")),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
 ):
-    q = db.query(PlantillaCarga)
+    sede_id = get_sede_activa(user)
+    q = db.query(PlantillaCarga).filter_by(sede_id=sede_id)
     if tipo:
         q = q.filter_by(tipo=tipo)
     return [_to_out(p) for p in q.order_by(PlantillaCarga.nombre).all()]
@@ -82,12 +83,14 @@ def listar(
 def crear(
     data: PlantillaIn,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(requiere_permiso("editar_catalogos")),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
 ):
     _validar(data)
-    if db.query(PlantillaCarga).filter_by(nombre=data.nombre).first():
+    sede_id = get_sede_activa(user)
+    if db.query(PlantillaCarga).filter_by(sede_id=sede_id, nombre=data.nombre).first():
         raise HTTPException(409, "Nombre de plantilla ya existe")
     p = PlantillaCarga(
+        sede_id=sede_id,
         nombre=data.nombre, tipo=data.tipo, labor_id=data.labor_id,
         configuracion=json.dumps(data.configuracion),
         unidad_origen=data.unidad_origen, activo=data.activo,
@@ -102,10 +105,11 @@ def crear(
 def actualizar(
     plantilla_id: int, data: PlantillaIn,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(requiere_permiso("editar_catalogos")),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
 ):
     _validar(data)
-    p = db.query(PlantillaCarga).get(plantilla_id)
+    sede_id = get_sede_activa(user)
+    p = db.query(PlantillaCarga).filter_by(id=plantilla_id, sede_id=sede_id).first()
     if not p:
         raise HTTPException(404, "No encontrada")
     p.nombre = data.nombre
@@ -123,9 +127,10 @@ def actualizar(
 def eliminar(
     plantilla_id: int,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(requiere_permiso("editar_catalogos")),
+    user: Usuario = Depends(requiere_permiso("editar_catalogos")),
 ):
-    p = db.query(PlantillaCarga).get(plantilla_id)
+    sede_id = get_sede_activa(user)
+    p = db.query(PlantillaCarga).filter_by(id=plantilla_id, sede_id=sede_id).first()
     if not p:
         raise HTTPException(404, "No encontrada")
     db.delete(p)
