@@ -18,6 +18,7 @@ export default function Calidad() {
   const [calculando, setCalculando] = useState(false);
   const [cargaModal, setCargaModal] = useState(false);
   const [detalleModal, setDetalleModal] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ── Catálogos y estado del modal ──
   const [labores, setLabores] = useState([]);
@@ -39,7 +40,7 @@ export default function Calidad() {
   useEffect(() => {
     if (semana) buscar();
     else setItems([]);
-  }, [semana]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [semana, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const laborOpciones = useMemo(() =>
     labores.map(l => ({
@@ -129,7 +130,7 @@ export default function Calidad() {
     try {
       await api.post('/calidad', { ...form, semana });
       cerrarModal();
-      await buscar();
+      setRefreshKey(k => k + 1);
     } catch (err) {
       setModalError(err.response?.data?.detail || 'Error al guardar');
     }
@@ -138,7 +139,7 @@ export default function Calidad() {
   async function eliminar(id) {
     if (!confirm('¿Eliminar registro de calidad?')) return;
     await api.delete(`/calidad/${id}`);
-    await buscar();
+    setRefreshKey(k => k + 1);
   }
 
   async function ejecutarCalculo() {

@@ -60,6 +60,7 @@ export default function RegistrosDiarios() {
   const [editando, setEditando] = useState({});
   const [saving, setSaving] = useState(null);
   const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ── Filtros de tabla ──
   const [filtroFecha, setFiltroFecha] = useState([]);
@@ -89,12 +90,12 @@ export default function RegistrosDiarios() {
       .catch(() => {});
   }, []);
 
-  // ─── Auto-buscar al cambiar semana ───────────────────────────────────────
+  // ─── Auto-buscar al cambiar semana o tras mutaciones ────────────────────
 
   useEffect(() => {
     if (semana) buscar();
     else { setRegistros([]); setEditando({}); }
-  }, [semana]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [semana, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Opciones de selectores ───────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ export default function RegistrosDiarios() {
   async function guardar() {
     if (!await crearRegistro()) return;
     cerrarModal();
-    await buscar();
+    setRefreshKey(k => k + 1);
   }
 
   async function guardarYOtro() {
@@ -307,6 +308,7 @@ export default function RegistrosDiarios() {
       unidades_tarea: '', horas_tarea: '',
     }));
     setModalError('');
+    setRefreshKey(k => k + 1);
   }
 
   // ─── Filtrado de tabla ────────────────────────────────────────────────────
