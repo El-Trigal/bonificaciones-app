@@ -28,7 +28,7 @@ function esDomingo(fechaStr) {
 
 const CAMPOS = [
   { key: 'tallos',               label: 'Unidades',     group: 'produccion' },
-  { key: 'unidades',             label: 'Rendimiento',  group: 'produccion', semaforo: true },
+  { key: '_rendimiento',         label: 'Rendimiento',  group: 'produccion', computed: true },
   { key: 'horas_ordinarias',     label: 'H. Ord',       group: 'horas', festivoBlock: true },
   { key: 'horas_extra_ordinarias', label: 'HE. Ord',    group: 'horas' },
   { key: 'horas_dominicales',    label: 'H. Dom',       group: 'horas' },
@@ -191,12 +191,16 @@ export default function RegistrosDiarios() {
     }));
   }
 
-  // Auto-calcular unidades si la labor usa tallos
+  // Sincroniza unidades al cambiar tallos (1:1 por defecto, ratio si tallos_por_ramo > 1)
   function handleTallosChange(val) {
     const tallos = val === '' ? '' : parseFloat(val) || 0;
-    let unidades = nuevo.unidades;
-    if (tallos !== '' && laborSel?.tallos_por_ramo > 1) {
+    let unidades;
+    if (tallos === '') {
+      unidades = '';
+    } else if ((laborSel?.tallos_por_ramo || 1) > 1) {
       unidades = +(tallos / laborSel.tallos_por_ramo).toFixed(3);
+    } else {
+      unidades = tallos;
     }
     setNuevo(prev => ({ ...prev, tallos, unidades }));
   }
@@ -461,29 +465,23 @@ export default function RegistrosDiarios() {
                     <td className="px-3 py-1.5 max-w-[150px] truncate">{r.labor}</td>
                     <td className="px-3 py-1.5 text-gray-500 max-w-[120px] truncate">{r.lider}</td>
                     {CAMPOS.map(c => {
-                      if (c.semaforo) {
+                      if (c.computed) {
                         const labor = labores.find(l => l.nombre === r.labor);
-                        const hOrd = r.horas_ordinarias || 0;
+                        const totalH = (r.horas_ordinarias || 0) + (r.horas_extra_ordinarias || 0);
+                        const ratio = totalH > 0 ? (r.unidades || 0) / totalH : null;
                         let semColor = null;
-                        if (labor?.rendimiento_min_hora && hOrd > 0) {
-                          const ratio = (r[c.key] || 0) / hOrd;
+                        if (ratio !== null && labor?.rendimiento_min_hora) {
                           semColor = ratio >= labor.rendimiento_min_hora ? 'bg-green-500' : 'bg-red-500';
                         }
                         return (
-                          <td key={c.key} className="px-1 py-1 text-right">
-                            <div className="flex items-center justify-end gap-1">
+                          <td key={c.key} className="px-3 py-1 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
                               {semColor && (
                                 <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${semColor}`} />
                               )}
-                              <input
-                                type="number"
-                                step="any"
-                                inputMode="decimal"
-                                defaultValue={r[c.key]}
-                                onChange={e => editarCampo(r.id, c.key, e.target.value)}
-                                className="w-20 px-1.5 py-0.5 text-right border border-gray-200 rounded text-xs
-                                           focus:outline-none focus:border-primary"
-                              />
+                              <span className="text-xs font-mono text-gray-700">
+                                {ratio !== null ? ratio.toFixed(2) + '/h' : '—'}
+                              </span>
                             </div>
                           </td>
                         );
@@ -622,34 +620,23 @@ export default function RegistrosDiarios() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                 Producción
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Unidades</label>
-                  <input
-                    type="number" step="any" inputMode="decimal" min="0"
-                    value={nuevo.tallos}
-                    onChange={e => handleTallosChange(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
-                               focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Rendimiento
-                    {laborSel?.tallos_por_ramo > 1 && (
-                      <span className="ml-1 text-gray-400">(auto)</span>
-                    )}
-                  </label>
-                  <input
-                    type="number" step="any" inputMode="decimal" min="0"
-                    value={nuevo.unidades}
-                    onChange={e => setNuevo(p => ({ ...p, unidades: e.target.value }))}
-                    placeholder="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
-                               focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Unidades
+                  {laborSel?.tallos_por_ramo > 1 && (
+                    <span className="ml-1 text-gray-400">
+                      (÷{laborSel.tallos_por_ramo} → {parseFloat(nuevo.unidades) || 0} unid)
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number" step="any" inputMode="decimal" min="0"
+                  value={nuevo.tallos}
+                  onChange={e => handleTallosChange(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                             focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                />
               </div>
             </section>
 
@@ -704,6 +691,36 @@ export default function RegistrosDiarios() {
                   {semanaInfo?.esFestivo ? 'Festivo' : 'Domingo'}: usa H. Dominicales para registrar trabajo de este día.
                 </p>
               )}
+
+              {/* Preview rendimiento en tiempo real */}
+              {(() => {
+                const totalH = (parseFloat(nuevo.horas_ordinarias) || 0) + (parseFloat(nuevo.horas_extra_ordinarias) || 0);
+                const unidadesVal = parseFloat(nuevo.unidades) || 0;
+                if (!unidadesVal && !totalH) return null;
+                const ratio = totalH > 0 ? unidadesVal / totalH : null;
+                const minReq = laborSel?.rendimiento_min_hora;
+                const cumple = ratio !== null && minReq ? ratio >= minReq : null;
+                return (
+                  <div className={`mt-3 flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm
+                    ${cumple === true ? 'bg-green-50 border border-green-200' :
+                      cumple === false ? 'bg-red-50 border border-red-200' :
+                      'bg-gray-50 border border-gray-200'}`}>
+                    {cumple !== null && (
+                      <span className={`inline-block w-3 h-3 rounded-full shrink-0
+                        ${cumple ? 'bg-green-500' : 'bg-red-500'}`} />
+                    )}
+                    <span className="font-mono font-semibold text-gray-800">
+                      {ratio !== null ? `${ratio.toFixed(2)}/h` : '—'}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {cumple === true && `Cumple mínimo (≥${minReq}/h)`}
+                      {cumple === false && `Bajo mínimo (mín ${minReq}/h)`}
+                      {cumple === null && ratio !== null && 'Sin mínimo definido'}
+                      {ratio === null && 'Ingresa horas para ver el rendimiento'}
+                    </span>
+                  </div>
+                );
+              })()}
             </section>
 
             {/* Tarea */}
