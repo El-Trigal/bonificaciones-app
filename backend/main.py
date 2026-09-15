@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 from database import engine, Base, SessionLocal
 from seed import seed_database
-from migracion_v2 import migrar_usuarios_seguridad, migrar_sedes, migrar_semanas_diarias
+from migracion_v2 import migrar_usuarios_seguridad, migrar_sedes, migrar_semanas_diarias, migrar_ramos_a_unidades
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
@@ -26,6 +26,7 @@ Base.metadata.create_all(bind=engine)
 migrar_usuarios_seguridad()
 migrar_sedes()
 migrar_semanas_diarias()
+migrar_ramos_a_unidades()
 
 # Seed de datos iniciales
 db = SessionLocal()
