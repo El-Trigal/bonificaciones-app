@@ -27,7 +27,7 @@ class RegistroDiarioOut(BaseModel):
     labor: str
     lider: str
     tallos: float
-    ramos: float
+    unidades: float
     horas_ordinarias: float
     horas_extra_ordinarias: float
     horas_dominicales: float
@@ -45,7 +45,7 @@ class RegistroDiarioIn(BaseModel):
     nombre_colaborador: str
     labor: str
     tallos: float = 0
-    ramos: float = 0
+    unidades: float = 0
     horas_ordinarias: float = 0
     horas_extra_ordinarias: float = 0
     horas_dominicales: float = 0
@@ -150,7 +150,7 @@ def confirmar_carga(
                 labor=r["labor"],
                 lider=r.get("lider") or _lider_por_labor(db, r["labor"], sede_id),
                 tallos=float(r.get("tallos", 0) or 0),
-                ramos=float(r.get("ramos", 0) or 0),
+                unidades=float(r.get("ramos", r.get("unidades", 0)) or 0),
                 horas_ordinarias=float(r.get("horas_ordinarias", 0) or 0),
                 horas_extra_ordinarias=float(r.get("horas_extra_ordinarias", 0) or 0),
                 horas_dominicales=float(r.get("horas_dominicales", 0) or 0),
@@ -277,7 +277,7 @@ def confirmar_semanal(
                 labor=r["labor"],
                 lider=r.get("lider") or _lider_por_labor(db, r["labor"], sede_id),
                 tallos=float(r.get("tallos", 0) or 0),
-                ramos=float(r.get("ramos", 0) or 0),
+                unidades=float(r.get("ramos", r.get("unidades", 0)) or 0),
                 horas_ordinarias=float(r.get("horas_ordinarias", 0) or 0),
                 horas_extra_ordinarias=float(r.get("horas_extra_ordinarias", 0) or 0),
                 horas_dominicales=float(r.get("horas_dominicales", 0) or 0),
@@ -418,7 +418,7 @@ def editar(
     if not reg:
         raise HTTPException(404, "No encontrado")
     editables = {
-        "tallos", "ramos", "horas_ordinarias", "horas_extra_ordinarias",
+        "tallos", "unidades", "horas_ordinarias", "horas_extra_ordinarias",
         "horas_dominicales", "unidades_tarea", "horas_tarea", "nombre_colaborador",
     }
     for k, v in data.items():

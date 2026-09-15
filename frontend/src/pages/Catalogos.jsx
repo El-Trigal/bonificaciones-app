@@ -187,7 +187,7 @@ function TabLabores() {
   const [filtroLider, setFiltroLider] = useState('');
 
   const defaults = {
-    nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1,
+    nombre: '', rendimiento_min_hora: '', tallos_por_ramo: 1, unidad_rendimiento: '',
     salario_base: configNomina.salario_base_default,
     tarifa_he_ordinaria: configNomina.tarifa_he_ordinaria,
     tarifa_he_dominical: configNomina.tarifa_he_dominical,
@@ -483,9 +483,16 @@ function TabLabores() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Unidad de rendimiento</label>
+            <input type="text" value={form.unidad_rendimiento ?? ''} onChange={e => setForm({...form, unidad_rendimiento: e.target.value})}
+              placeholder="ej. ramos, unidades, metros..."
+              className="w-full border rounded-lg px-3 py-2" />
+            <p className="text-xs text-gray-400 mt-1">Descripción de la unidad en que se mide el rendimiento</p>
+          </div>
           {[
             ['rendimiento_min_hora', 'Rendimiento mín/hora', 'Unidades por hora mínimas exigidas'],
-            ['tallos_por_ramo', 'Tallos por ramo', 'Factor de conversión'],
+            ['tallos_por_ramo', 'Factor conversión (tallos/unidad)', 'Factor de conversión tallos → unidades'],
             ['salario_base', 'Salario base', 'Base para cálculo de costo estándar'],
             ['tarifa_he_ordinaria', 'Tarifa HE ordinaria', 'Valor hora extra ordinaria'],
             ['tarifa_he_dominical', 'Tarifa HE dominical', 'Valor hora extra dominical'],

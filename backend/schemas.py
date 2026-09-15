@@ -121,6 +121,7 @@ class LaborRendimientoBase(BaseModel):
     lider_id: Optional[int] = None
     rendimiento_min_hora: float
     tallos_por_ramo: int = 1
+    unidad_rendimiento: Optional[str] = None
     salario_base: float = 1423500
     tarifa_he_ordinaria: float = 7736
     tarifa_he_dominical: float = 12378
@@ -138,6 +139,7 @@ class LaborRendimientoUpdate(BaseModel):
     lider_id: Optional[int] = None
     rendimiento_min_hora: Optional[float] = None
     tallos_por_ramo: Optional[int] = None
+    unidad_rendimiento: Optional[str] = None
     salario_base: Optional[float] = None
     tarifa_he_ordinaria: Optional[float] = None
     tarifa_he_dominical: Optional[float] = None

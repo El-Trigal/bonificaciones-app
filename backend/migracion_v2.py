@@ -166,6 +166,24 @@ def migrar_usuarios_seguridad():
     agregar_columna_si_falta("usuarios", "bloqueado_hasta", "TIMESTAMP")
 
 
+def migrar_ramos_a_unidades():
+    print("[+] Renombrando 'ramos' → 'unidades' en registros_diarios...")
+    cols = columnas_existentes("registros_diarios")
+    if "unidades" in cols:
+        print("  [=] Columna 'unidades' ya existe en registros_diarios")
+    elif "ramos" in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE registros_diarios RENAME COLUMN ramos TO unidades"))
+        print("  [+] Columna registros_diarios.ramos renombrada a unidades")
+    else:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE registros_diarios ADD COLUMN unidades REAL DEFAULT 0"))
+        print("  [+] Columna registros_diarios.unidades creada")
+
+    print("[+] Agregando 'unidad_rendimiento' a labores_rendimiento...")
+    agregar_columna_si_falta("labores_rendimiento", "unidad_rendimiento", "TEXT")
+
+
 def main():
     print("=" * 60)
     print("MIGRACION V2 - Sistema de Bonificaciones")
@@ -175,6 +193,7 @@ def main():
         migrar_sedes()
         migrar_semanas()
         migrar_usuarios_seguridad()
+        migrar_ramos_a_unidades()
         db = SessionLocal()
         try:
             sembrar_periodos_2026(db)

@@ -59,7 +59,7 @@ def _consolidar_a_shim(grupos: list[RegistroDiario], db: Session, sede_id: int):
 
     for r in grupos:
         dk = _dia_key(r.fecha.weekday())
-        datos[f"{dk}_ramos"] += float(r.ramos or 0)
+        datos[f"{dk}_ramos"] += float(r.unidades or 0)
         datos[f"{dk}_hs_ord"] += float(r.horas_ordinarias or 0)
         datos[f"{dk}_hs_extra"] += float(r.horas_extra_ordinarias or 0)
         datos[f"{dk}_unid_tarea"] += float(r.unidades_tarea or 0)

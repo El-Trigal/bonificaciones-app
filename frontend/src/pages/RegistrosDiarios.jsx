@@ -27,13 +27,13 @@ function esDomingo(fechaStr) {
 // ─── Campos numéricos del formulario ─────────────────────────────────────────
 
 const CAMPOS = [
-  { key: 'tallos',               label: 'Tallos',     group: 'produccion' },
-  { key: 'ramos',                label: 'Ramos',      group: 'produccion' },
-  { key: 'horas_ordinarias',     label: 'H. Ord',     group: 'horas', festivoBlock: true },
-  { key: 'horas_extra_ordinarias', label: 'HE. Ord',  group: 'horas' },
-  { key: 'horas_dominicales',    label: 'H. Dom',     group: 'horas' },
-  { key: 'unidades_tarea',       label: 'Ud. Tarea',  group: 'tarea' },
-  { key: 'horas_tarea',          label: 'H. Tarea',   group: 'tarea' },
+  { key: 'tallos',               label: 'Unidades',     group: 'produccion' },
+  { key: 'unidades',             label: 'Rendimiento',  group: 'produccion', semaforo: true },
+  { key: 'horas_ordinarias',     label: 'H. Ord',       group: 'horas', festivoBlock: true },
+  { key: 'horas_extra_ordinarias', label: 'HE. Ord',    group: 'horas' },
+  { key: 'horas_dominicales',    label: 'H. Dom',       group: 'horas' },
+  { key: 'unidades_tarea',       label: 'Ud. Tarea',    group: 'tarea' },
+  { key: 'horas_tarea',          label: 'H. Tarea',     group: 'tarea' },
 ];
 
 const CAMPOS_TABLA = CAMPOS.map(c => c.key);
@@ -41,7 +41,7 @@ const CAMPOS_TABLA = CAMPOS.map(c => c.key);
 const NUEVO_VACIO = {
   fecha: '', codigo_colaborador: '', nombre_colaborador: '',
   labor: '', lider: '',
-  tallos: '', ramos: '', horas_ordinarias: '', horas_extra_ordinarias: '',
+  tallos: '', unidades: '', horas_ordinarias: '', horas_extra_ordinarias: '',
   horas_dominicales: '', unidades_tarea: '', horas_tarea: '',
 };
 
@@ -191,14 +191,14 @@ export default function RegistrosDiarios() {
     }));
   }
 
-  // Auto-calcular ramos si la labor usa tallos
+  // Auto-calcular unidades si la labor usa tallos
   function handleTallosChange(val) {
     const tallos = val === '' ? '' : parseFloat(val) || 0;
-    let ramos = nuevo.ramos;
+    let unidades = nuevo.unidades;
     if (tallos !== '' && laborSel?.tallos_por_ramo > 1) {
-      ramos = +(tallos / laborSel.tallos_por_ramo).toFixed(3);
+      unidades = +(tallos / laborSel.tallos_por_ramo).toFixed(3);
     }
-    setNuevo(prev => ({ ...prev, tallos, ramos }));
+    setNuevo(prev => ({ ...prev, tallos, unidades }));
   }
 
   // ─── Tabla: buscar, editar, guardar, eliminar ─────────────────────────────
@@ -276,7 +276,7 @@ export default function RegistrosDiarios() {
       nombre_colaborador: nuevo.nombre_colaborador,
       labor: nuevo.labor,
       tallos:                  parseFloat(nuevo.tallos)                  || 0,
-      ramos:                   parseFloat(nuevo.ramos)                   || 0,
+      unidades:                parseFloat(nuevo.unidades)                || 0,
       horas_ordinarias:        parseFloat(nuevo.horas_ordinarias)        || 0,
       horas_extra_ordinarias:  parseFloat(nuevo.horas_extra_ordinarias)  || 0,
       horas_dominicales:       parseFloat(nuevo.horas_dominicales)       || 0,
@@ -303,7 +303,7 @@ export default function RegistrosDiarios() {
     // Conservar fecha, colaborador, labor y lider — solo limpiar valores numéricos
     setNuevo(prev => ({
       ...prev,
-      tallos: '', ramos: '', horas_ordinarias: '',
+      tallos: '', unidades: '', horas_ordinarias: '',
       horas_extra_ordinarias: '', horas_dominicales: '',
       unidades_tarea: '', horas_tarea: '',
     }));
@@ -460,19 +460,48 @@ export default function RegistrosDiarios() {
                     <td className="px-3 py-1.5 max-w-[180px] truncate">{r.nombre_colaborador}</td>
                     <td className="px-3 py-1.5 max-w-[150px] truncate">{r.labor}</td>
                     <td className="px-3 py-1.5 text-gray-500 max-w-[120px] truncate">{r.lider}</td>
-                    {CAMPOS.map(c => (
-                      <td key={c.key} className="px-1 py-1 text-right">
-                        <input
-                          type="number"
-                          step="any"
-                          inputMode="decimal"
-                          defaultValue={r[c.key]}
-                          onChange={e => editarCampo(r.id, c.key, e.target.value)}
-                          className="w-20 px-1.5 py-0.5 text-right border border-gray-200 rounded text-xs
-                                     focus:outline-none focus:border-primary"
-                        />
-                      </td>
-                    ))}
+                    {CAMPOS.map(c => {
+                      if (c.semaforo) {
+                        const labor = labores.find(l => l.nombre === r.labor);
+                        const hOrd = r.horas_ordinarias || 0;
+                        let semColor = null;
+                        if (labor?.rendimiento_min_hora && hOrd > 0) {
+                          const ratio = (r[c.key] || 0) / hOrd;
+                          semColor = ratio >= labor.rendimiento_min_hora ? 'bg-green-500' : 'bg-red-500';
+                        }
+                        return (
+                          <td key={c.key} className="px-1 py-1 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {semColor && (
+                                <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${semColor}`} />
+                              )}
+                              <input
+                                type="number"
+                                step="any"
+                                inputMode="decimal"
+                                defaultValue={r[c.key]}
+                                onChange={e => editarCampo(r.id, c.key, e.target.value)}
+                                className="w-20 px-1.5 py-0.5 text-right border border-gray-200 rounded text-xs
+                                           focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={c.key} className="px-1 py-1 text-right">
+                          <input
+                            type="number"
+                            step="any"
+                            inputMode="decimal"
+                            defaultValue={r[c.key]}
+                            onChange={e => editarCampo(r.id, c.key, e.target.value)}
+                            className="w-20 px-1.5 py-0.5 text-right border border-gray-200 rounded text-xs
+                                       focus:outline-none focus:border-primary"
+                          />
+                        </td>
+                      );
+                    })}
                     <td className="px-3 py-1.5 text-center">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium
                         ${r.origen === 'MANUAL' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -595,7 +624,7 @@ export default function RegistrosDiarios() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Tallos</label>
+                  <label className="block text-xs text-gray-600 mb-1">Unidades</label>
                   <input
                     type="number" step="any" inputMode="decimal" min="0"
                     value={nuevo.tallos}
@@ -607,15 +636,15 @@ export default function RegistrosDiarios() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">
-                    Ramos
+                    Rendimiento
                     {laborSel?.tallos_por_ramo > 1 && (
                       <span className="ml-1 text-gray-400">(auto)</span>
                     )}
                   </label>
                   <input
                     type="number" step="any" inputMode="decimal" min="0"
-                    value={nuevo.ramos}
-                    onChange={e => setNuevo(p => ({ ...p, ramos: e.target.value }))}
+                    value={nuevo.unidades}
+                    onChange={e => setNuevo(p => ({ ...p, unidades: e.target.value }))}
                     placeholder="0"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
                                focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
