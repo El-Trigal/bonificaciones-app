@@ -35,13 +35,13 @@ export default function Usuarios() {
     if (esSuperAdmin && sedes.length === 0) fetchSedes();
   }, []);
 
-  async function cargar() {
-    setLoading(true);
+  async function cargar(mostrarCarga = true) {
+    if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get('/auth/usuarios');
       setUsuarios(data);
     } finally {
-      setLoading(false);
+      if (mostrarCarga) setLoading(false);
     }
   }
 
@@ -88,7 +88,7 @@ export default function Usuarios() {
         await api.patch(`/auth/usuarios/${modal.user.id}`, body);
       }
       setModal(null);
-      await cargar();
+      await cargar(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al guardar');
     } finally {
@@ -99,7 +99,7 @@ export default function Usuarios() {
   async function desbloquear(u) {
     try {
       await api.post(`/auth/usuarios/${u.id}/desbloquear`);
-      await cargar();
+      await cargar(false);
     } catch (err) {
       alert(err.response?.data?.detail || 'Error al desbloquear');
     }

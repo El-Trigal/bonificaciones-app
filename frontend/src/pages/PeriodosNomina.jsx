@@ -19,13 +19,13 @@ export default function PeriodosNomina() {
   const [consolidado, setConsolidado] = useState(null);
   const [error, setError] = useState('');
 
-  async function cargar() {
-    setLoading(true);
+  async function cargar(mostrarCarga = true) {
+    if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get('/periodos', { params: { año: 2026 } });
       setPeriodos(data);
     } finally {
-      setLoading(false);
+      if (mostrarCarga) setLoading(false);
     }
   }
   useEffect(() => { cargar(); }, []);
@@ -35,7 +35,7 @@ export default function PeriodosNomina() {
     setError('');
     try {
       await api.post(`/periodos/${id}/${path}`);
-      await cargar();
+      await cargar(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error');
     }

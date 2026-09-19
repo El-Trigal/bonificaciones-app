@@ -28,8 +28,8 @@ export default function Plantillas() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  async function cargar() {
-    setLoading(true);
+  async function cargar(mostrarCarga = true) {
+    if (mostrarCarga) setLoading(true);
     try {
       const [{ data: pls }, { data: labs }] = await Promise.all([
         api.get('/plantillas'),
@@ -38,7 +38,7 @@ export default function Plantillas() {
       setItems(pls);
       setLabores(labs);
     } finally {
-      setLoading(false);
+      if (mostrarCarga) setLoading(false);
     }
   }
 
@@ -78,7 +78,7 @@ export default function Plantillas() {
       if (modal.mode === 'create') await api.post('/plantillas', body);
       else await api.patch(`/plantillas/${modal.id}`, body);
       setModal(null);
-      await cargar();
+      await cargar(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al guardar');
     } finally {
@@ -89,7 +89,7 @@ export default function Plantillas() {
   async function eliminar(id) {
     if (!confirm('¿Eliminar plantilla?')) return;
     await api.delete(`/plantillas/${id}`);
-    await cargar();
+    await cargar(false);
   }
 
   return (

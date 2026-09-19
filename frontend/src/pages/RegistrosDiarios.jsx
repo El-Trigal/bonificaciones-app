@@ -191,14 +191,16 @@ export default function RegistrosDiarios() {
     }));
   }
 
-  // Sincroniza unidades al cambiar tallos (1:1 por defecto, ratio si tallos_por_ramo > 1)
+  // Sincroniza unidades al cambiar tallos (1:1 por defecto, factor si tallos_por_ramo > 1).
+  // El colaborador reporta en la unidad base del catálogo (ej. camas, bandejas) y el
+  // factor de conversión la multiplica hacia la unidad de rendimiento (ej. tallos/unidades).
   function handleTallosChange(val) {
     const tallos = val === '' ? '' : parseFloat(val) || 0;
     let unidades;
     if (tallos === '') {
       unidades = '';
     } else if ((laborSel?.tallos_por_ramo || 1) > 1) {
-      unidades = +(tallos / laborSel.tallos_por_ramo).toFixed(3);
+      unidades = +(tallos * laborSel.tallos_por_ramo).toFixed(3);
     } else {
       unidades = tallos;
     }
@@ -623,9 +625,12 @@ export default function RegistrosDiarios() {
               <div>
                 <label className="block text-xs text-gray-600 mb-1">
                   Unidades
+                  {laborSel?.unidad_rendimiento && (
+                    <span className="ml-1 text-gray-400">({laborSel.unidad_rendimiento})</span>
+                  )}
                   {laborSel?.tallos_por_ramo > 1 && (
                     <span className="ml-1 text-gray-400">
-                      (÷{laborSel.tallos_por_ramo} → {parseFloat(nuevo.unidades) || 0} unid)
+                      (×{laborSel.tallos_por_ramo} → {parseFloat(nuevo.unidades) || 0} unid)
                     </span>
                   )}
                 </label>

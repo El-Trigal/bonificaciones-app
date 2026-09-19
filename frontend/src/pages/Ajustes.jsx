@@ -21,14 +21,14 @@ export default function Ajustes() {
   const [form, setForm] = useState({ semana: '', motivo: '' });
   const [msg, setMsg] = useState('');
 
-  async function cargar() {
-    setLoading(true);
+  async function cargar(mostrarCarga = true) {
+    if (mostrarCarga) setLoading(true);
     try {
       const params = filtro === 'TODOS' ? {} : { estado: filtro };
       const { data } = await api.get('/ajustes', { params });
       setItems(data);
     } finally {
-      setLoading(false);
+      if (mostrarCarga) setLoading(false);
     }
   }
   useEffect(() => { cargar(); }, [filtro]);
@@ -40,7 +40,7 @@ export default function Ajustes() {
       const { data } = await api.post('/ajustes/recalcular-semana', form);
       setMsg(`Recálculo para ${data.semana}: ${data.ajustes_creados} ajustes creados. Origen: ${data.periodo_origen} → Destino: ${data.periodo_destino}`);
       setForm({ semana: '', motivo: '' });
-      await cargar();
+      await cargar(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error');
     }
@@ -50,7 +50,7 @@ export default function Ajustes() {
     if (!confirm(confirmMsg)) return;
     try {
       await api.post(`/ajustes/${id}/${path}`);
-      await cargar();
+      await cargar(false);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error');
     }

@@ -47,13 +47,13 @@ function TabEmpleados() {
   const [form, setForm] = useState({ codigo: '', nombre: '', cargo: 'OPERARIO' });
   const [importModal, setImportModal] = useState(false);
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
+  const cargar = useCallback(async (mostrarCarga = true) => {
+    if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get('/catalogos/empleados', { params: { buscar: buscar || undefined } });
       setEmpleados(data);
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (mostrarCarga) setLoading(false);
   }, [buscar]);
 
   useEffect(() => { cargar(); }, [cargar]);
@@ -66,14 +66,14 @@ function TabEmpleados() {
         await api.put(`/catalogos/empleados/${modal.id}`, { nombre: form.nombre, cargo: form.cargo });
       }
       setModal(null);
-      cargar();
+      cargar(false);
     } catch (e) { alert(e.response?.data?.detail || 'Error al guardar'); }
   };
 
   const desactivar = async (id) => {
     if (!confirm('¿Desactivar este empleado?')) return;
     await api.delete(`/catalogos/empleados/${id}`);
-    cargar();
+    cargar(false);
   };
 
   return (
@@ -99,7 +99,7 @@ function TabEmpleados() {
       <ExcelUploadModal
         isOpen={importModal}
         onClose={() => setImportModal(false)}
-        onSuccess={() => { setImportModal(false); cargar(); }}
+        onSuccess={() => { setImportModal(false); cargar(false); }}
         config={EXCEL_EMPLEADOS_CONFIG}
       />
 
@@ -196,13 +196,13 @@ function TabLabores() {
     pct_cortadores: 0.86, pct_apoyo: 0.14,
   };
 
-  const cargar = async () => {
-    setLoading(true);
+  const cargar = async (mostrarCarga = true) => {
+    if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get('/catalogos/labores-rendimiento');
       setLabores(data);
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (mostrarCarga) setLoading(false);
   };
 
   const cargarConfigNomina = async () => {
@@ -246,7 +246,7 @@ function TabLabores() {
       const { data } = await api.put('/catalogos/config-nomina', { ...configForm, propagar: ok });
       setConfigNomina(data);
       setConfigModal(false);
-      if (ok) cargar();
+      if (ok) cargar(false);
     } catch (e) {
       alert(e.response?.data?.detail || 'Error al guardar');
     } finally {
@@ -308,7 +308,7 @@ function TabLabores() {
         await api.put(`/catalogos/labores-rendimiento/${modal.id}`, payload);
       }
       setModal(null);
-      cargar();
+      cargar(false);
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
@@ -703,8 +703,8 @@ function TabSemanas() {
   const [paginaOffset, setPaginaOffset] = useState(0);
   const PAGE_SIZE = 10;
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
+  const cargar = useCallback(async (mostrarCarga = true) => {
+    if (mostrarCarga) setLoading(true);
     try {
       const [{ data: sw }, { data: fest }, { data: cfg }] = await Promise.all([
         api.get('/catalogos/semanas', { params: { año } }),
@@ -714,9 +714,9 @@ function TabSemanas() {
       setSemanasData(sw);
       setFestivos(new Set(fest));
       setConfig(cfg);
-      setPaginaOffset(0);
+      if (mostrarCarga) setPaginaOffset(0);
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (mostrarCarga) setLoading(false);
   }, [año]);
 
   useEffect(() => { cargar(); }, [cargar]);
@@ -727,7 +727,7 @@ function TabSemanas() {
     try {
       const { data } = await api.post('/catalogos/semanas/generar-ano', null, { params: { año } });
       alert(`Semanas generadas: ${data.creadas}${data.omitidas ? `\nYa existían: ${data.omitidas}` : ''}`);
-      cargar();
+      cargar(false);
     } catch (e) {
       alert(e.response?.data?.detail || 'Error al generar semanas');
     } finally { setGenerando(false); }
@@ -742,7 +742,7 @@ function TabSemanas() {
     try {
       await api.put('/catalogos/config-semanas', { ...configForm, propagar, año_propagar: propagar ? año : null });
       setConfigModal(false);
-      cargar();
+      cargar(false);
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
     finally { setGuardandoConfig(false); }
   };
@@ -758,7 +758,7 @@ function TabSemanas() {
     try {
       await api.put(`/catalogos/semanas/${editModal.id}`, editForm);
       setEditModal(null);
-      cargar();
+      cargar(false);
     } catch (e) { alert('Error al guardar'); }
   };
 
@@ -767,7 +767,7 @@ function TabSemanas() {
     const plantilla = {};
     DIA_KEYS.forEach((k, i) => { plantilla[k] = config[DIA_CONFIG[i]]; });
     await api.put(`/catalogos/semanas/${s.id}`, { ...plantilla, modificacion_manual: false });
-    cargar();
+    cargar(false);
   };
 
   const orden = diasOrdenados(config.dia_inicio_semana);
@@ -1034,8 +1034,8 @@ function CrudSimple({ endpoint, label, singular }) {
 
   const esLideres = endpoint === '/catalogos/lideres';
 
-  const cargar = async () => {
-    setLoading(true);
+  const cargar = async (mostrarCarga = true) => {
+    if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get(endpoint);
       setItems(data);
@@ -1048,7 +1048,7 @@ function CrudSimple({ endpoint, label, singular }) {
         setLaboresPorLider(mapa);
       }
     } catch (e) { console.error(e); }
-    setLoading(false);
+    if (mostrarCarga) setLoading(false);
   };
 
   useEffect(() => { cargar(); }, [endpoint]);
@@ -1061,7 +1061,7 @@ function CrudSimple({ endpoint, label, singular }) {
     try {
       await api.post(endpoint, { nombre: nombre.trim() });
       setModal(false);
-      cargar();
+      cargar(false);
     } catch (e) {
       alert(e.response?.data?.detail || 'Error al guardar');
     } finally {
@@ -1072,7 +1072,7 @@ function CrudSimple({ endpoint, label, singular }) {
   const desactivar = async (id) => {
     if (!confirm('¿Desactivar?')) return;
     await api.delete(`${endpoint}/${id}`);
-    cargar();
+    cargar(false);
   };
 
   return (
