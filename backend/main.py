@@ -18,7 +18,7 @@ from database import engine, Base, SessionLocal
 from seed import seed_database
 from migracion_v2 import (
     migrar_usuarios_seguridad, migrar_sedes, migrar_semanas_diarias, migrar_ramos_a_unidades,
-    migrar_tipo_bonificacion_labores, backfill_tipo_bonificacion,
+    migrar_tipo_bonificacion_labores, backfill_tipo_bonificacion, migrar_producto_area_labor,
 )
 
 # Crear tablas
@@ -31,6 +31,7 @@ migrar_sedes()
 migrar_semanas_diarias()
 migrar_ramos_a_unidades()
 migrar_tipo_bonificacion_labores()
+migrar_producto_area_labor()
 
 # Seed de datos iniciales
 db = SessionLocal()

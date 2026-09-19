@@ -192,6 +192,18 @@ def migrar_tipo_bonificacion_labores():
     )
 
 
+def migrar_producto_area_labor():
+    """Solo agrega columnas (sin backfill): la asignacion de producto/area por
+    labor, y por registro diario, la puebla el usuario manualmente."""
+    print("[+] Agregando 'producto_area_id' a labores_rendimiento...")
+    agregar_columna_si_falta(
+        "labores_rendimiento", "producto_area_id",
+        "INTEGER REFERENCES productos_areas(id)"
+    )
+    print("[+] Agregando 'producto_area' a registros_diarios...")
+    agregar_columna_si_falta("registros_diarios", "producto_area", "TEXT")
+
+
 def backfill_tipo_bonificacion(db):
     """Toda labor sin tipo asignado queda como RENDIMIENTO (lo que ya era implícitamente).
     También garantiza que exista el tipo CALIDAD por sede, para poder catalogar la labor
@@ -227,6 +239,7 @@ def main():
         migrar_usuarios_seguridad()
         migrar_ramos_a_unidades()
         migrar_tipo_bonificacion_labores()
+        migrar_producto_area_labor()
         db = SessionLocal()
         try:
             sembrar_periodos_2026(db)

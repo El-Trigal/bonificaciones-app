@@ -170,6 +170,7 @@ function TabLabores() {
   const [labores, setLabores] = useState([]);
   const [lideres, setLideres] = useState([]);
   const [tiposBonificacion, setTiposBonificacion] = useState([]);
+  const [productosAreas, setProductosAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
@@ -259,6 +260,7 @@ function TabLabores() {
     cargarConfigNomina();
     api.get('/catalogos/lideres').then(({ data }) => setLideres(data)).catch(() => setLideres([]));
     api.get('/catalogos/tipos-bonificacion').then(({ data }) => setTiposBonificacion(data)).catch(() => setTiposBonificacion([]));
+    api.get('/catalogos/productos-areas').then(({ data }) => setProductosAreas(data)).catch(() => setProductosAreas([]));
   }, []);
 
   async function recomputarLideres() {
@@ -495,6 +497,17 @@ function TabLabores() {
               ))}
             </select>
             <p className="text-xs text-gray-400 mt-1">Si no es RENDIMIENTO, es un bono fijo (ej. CALIDAD) — no aplica rendimiento/unidades</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Producto / Área</label>
+            <select value={form.producto_area_id ?? ''} onChange={e => setForm({...form, producto_area_id: e.target.value ? parseInt(e.target.value) : null})}
+              className="w-full border rounded-lg px-3 py-2 bg-white">
+              <option value="">— Sin definir —</option>
+              {productosAreas.filter(p => p.activo).map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Déjalo sin definir para labores transversales (ej. AJUSTE, TRACTORISTA) que no son de un solo producto/área</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Unidad de rendimiento</label>
@@ -1031,21 +1044,31 @@ function CrudSimple({ endpoint, label, singular }) {
   const [nombre, setNombre] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [laboresPorLider, setLaboresPorLider] = useState({});
+  const [laboresPorProducto, setLaboresPorProducto] = useState({});
 
   const esLideres = endpoint === '/catalogos/lideres';
+  const esProductos = endpoint === '/catalogos/productos-areas';
 
   const cargar = async (mostrarCarga = true) => {
     if (mostrarCarga) setLoading(true);
     try {
       const { data } = await api.get(endpoint);
       setItems(data);
-      if (esLideres) {
+      if (esLideres || esProductos) {
         const { data: labs } = await api.get('/catalogos/labores-rendimiento');
-        const mapa = {};
-        for (const l of labs) {
-          if (l.lider_id) (mapa[l.lider_id] ||= []).push(l.nombre);
+        if (esLideres) {
+          const mapa = {};
+          for (const l of labs) {
+            if (l.lider_id) (mapa[l.lider_id] ||= []).push(l.nombre);
+          }
+          setLaboresPorLider(mapa);
+        } else {
+          const mapa = {};
+          for (const l of labs) {
+            if (l.producto_area_id) (mapa[l.producto_area_id] ||= []).push(l.nombre);
+          }
+          setLaboresPorProducto(mapa);
         }
-        setLaboresPorLider(mapa);
       }
     } catch (e) { console.error(e); }
     if (mostrarCarga) setLoading(false);
@@ -1089,6 +1112,7 @@ function CrudSimple({ endpoint, label, singular }) {
             <tr className="border-b bg-gray-50">
               <th className="text-left p-3">Nombre</th>
               {esLideres && <th className="text-left p-3">Labores a cargo</th>}
+              {esProductos && <th className="text-left p-3">Labores asociadas</th>}
               <th className="text-left p-3">Estado</th>
               <th className="p-3">Acciones</th>
             </tr>
@@ -1102,6 +1126,16 @@ function CrudSimple({ endpoint, label, singular }) {
                     {(laboresPorLider[item.id] || []).length === 0
                       ? <span className="text-gray-400 italic">Sin labores asignadas</span>
                       : (laboresPorLider[item.id] || []).map((n, i) => (
+                          <span key={i} className="inline-block bg-primary-50 text-primary-800 px-2 py-0.5 rounded mr-1 mb-1">{n}</span>
+                        ))
+                    }
+                  </td>
+                )}
+                {esProductos && (
+                  <td className="p-3 text-gray-600 text-xs">
+                    {(laboresPorProducto[item.id] || []).length === 0
+                      ? <span className="text-gray-400 italic">Sin labores asignadas</span>
+                      : (laboresPorProducto[item.id] || []).map((n, i) => (
                           <span key={i} className="inline-block bg-primary-50 text-primary-800 px-2 py-0.5 rounded mr-1 mb-1">{n}</span>
                         ))
                     }

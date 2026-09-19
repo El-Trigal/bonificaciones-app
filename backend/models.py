@@ -118,6 +118,7 @@ class LaborRendimiento(Base):
     nombre = Column(Text, nullable=False)
     lider_id = Column(Integer, ForeignKey("lideres.id"), nullable=True)
     tipo_bonificacion_id = Column(Integer, ForeignKey("tipos_bonificacion.id"), nullable=True)
+    producto_area_id = Column(Integer, ForeignKey("productos_areas.id"), nullable=True)
     rendimiento_min_hora = Column(Float, nullable=False)
     tallos_por_ramo = Column(Integer, default=1)
     unidad_rendimiento = Column(Text, nullable=True)  # ej. "ramos", "unidades", "metros"
@@ -137,6 +138,7 @@ class LaborRendimiento(Base):
 
     lider_rel = relationship("Lider", back_populates="labores")
     tipo_bonificacion_rel = relationship("TipoBonificacion")
+    producto_area_rel = relationship("ProductoArea")
 
     @property
     def lider_nombre(self) -> str | None:
@@ -145,6 +147,10 @@ class LaborRendimiento(Base):
     @property
     def tipo_bonificacion_nombre(self) -> str | None:
         return self.tipo_bonificacion_rel.nombre if self.tipo_bonificacion_rel else None
+
+    @property
+    def producto_area_nombre(self) -> str | None:
+        return self.producto_area_rel.nombre if self.producto_area_rel else None
 
     def recalcular_valores(self):
         horas_semana = 43.5
@@ -470,6 +476,7 @@ class RegistroDiario(Base):
     nombre_colaborador = Column(Text, nullable=False)
     labor = Column(Text, nullable=False)
     lider = Column(Text, nullable=False)
+    producto_area = Column(Text, nullable=True)
     # Producción (tallos se convierte a unidades vía tallos_por_ramo)
     tallos = Column(Float, default=0)
     unidades = Column(Float, default=0)

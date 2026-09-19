@@ -40,7 +40,7 @@ const CAMPOS_TABLA = CAMPOS.map(c => c.key);
 
 const NUEVO_VACIO = {
   fecha: '', codigo_colaborador: '', nombre_colaborador: '',
-  labor: '', lider: '',
+  labor: '', lider: '', producto_area: '',
   tallos: '', unidades: '', horas_ordinarias: '', horas_extra_ordinarias: '',
   horas_dominicales: '', unidades_tarea: '', horas_tarea: '',
 };
@@ -51,6 +51,7 @@ export default function RegistrosDiarios() {
   // ── Catálogos ──
   const [labores, setLabores] = useState([]);
   const [lideres, setLideres] = useState([]);
+  const [productosAreas, setProductosAreas] = useState([]);
   const [festivosCache, setFestivosCache] = useState({});
 
   // ── Tabla ──
@@ -87,6 +88,9 @@ export default function RegistrosDiarios() {
       .catch(() => {});
     api.get('/catalogos/lideres', { params: { activo: true } })
       .then(r => setLideres(r.data))
+      .catch(() => {});
+    api.get('/catalogos/productos-areas', { params: { activo: true } })
+      .then(r => setProductosAreas(r.data))
       .catch(() => {});
   }, []);
 
@@ -180,7 +184,7 @@ export default function RegistrosDiarios() {
   function handleLaborSelect(opt) {
     if (!opt) {
       setLaborSel(null);
-      setNuevo(prev => ({ ...prev, labor: '', lider: '' }));
+      setNuevo(prev => ({ ...prev, labor: '', lider: '', producto_area: '' }));
       return;
     }
     setLaborSel(opt._obj);
@@ -188,6 +192,7 @@ export default function RegistrosDiarios() {
       ...prev,
       labor: opt._obj.nombre,
       lider: opt._obj.lider_nombre || '',
+      producto_area: opt._obj.producto_area_nombre || '',
     }));
   }
 
@@ -281,6 +286,7 @@ export default function RegistrosDiarios() {
       codigo_colaborador: parseInt(nuevo.codigo_colaborador) || 0,
       nombre_colaborador: nuevo.nombre_colaborador,
       labor: nuevo.labor,
+      producto_area:           nuevo.producto_area || null,
       tallos:                  parseFloat(nuevo.tallos)                  || 0,
       unidades:                parseFloat(nuevo.unidades)                || 0,
       horas_ordinarias:        parseFloat(nuevo.horas_ordinarias)        || 0,
@@ -614,6 +620,19 @@ export default function RegistrosDiarios() {
                   <span className="text-gray-400">Líder:</span>
                   <span className="font-medium">{nuevo.lider}</span>
                 </p>
+              )}
+              {nuevo.labor && (
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-600 mb-1">Producto / Área</label>
+                  <select value={nuevo.producto_area || ''} onChange={e => setNuevo(p => ({ ...p, producto_area: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                               focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                    <option value="">— Seleccionar —</option>
+                    {productosAreas.map(p => (
+                      <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                    ))}
+                  </select>
+                </div>
               )}
             </section>
 

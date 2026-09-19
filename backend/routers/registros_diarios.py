@@ -26,6 +26,7 @@ class RegistroDiarioOut(BaseModel):
     nombre_colaborador: str
     labor: str
     lider: str
+    producto_area: Optional[str] = None
     tallos: float
     unidades: float
     horas_ordinarias: float
@@ -44,6 +45,7 @@ class RegistroDiarioIn(BaseModel):
     codigo_colaborador: int
     nombre_colaborador: str
     labor: str
+    producto_area: Optional[str] = None
     tallos: float = 0
     unidades: float = 0
     horas_ordinarias: float = 0
@@ -420,6 +422,7 @@ def editar(
     editables = {
         "tallos", "unidades", "horas_ordinarias", "horas_extra_ordinarias",
         "horas_dominicales", "unidades_tarea", "horas_tarea", "nombre_colaborador",
+        "producto_area",
     }
     for k, v in data.items():
         if k in editables:
