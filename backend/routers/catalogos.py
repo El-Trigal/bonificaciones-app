@@ -412,6 +412,10 @@ def crear_labor(
     sede_id = get_sede_activa(user)
     if db.query(LaborRendimiento).filter_by(sede_id=sede_id, nombre=data.nombre).first():
         raise HTTPException(400, f"Ya existe la labor '{data.nombre}'")
+    if data.tipo_bonificacion_id and not db.query(TipoBonificacion).filter_by(
+        id=data.tipo_bonificacion_id, sede_id=sede_id
+    ).first():
+        raise HTTPException(400, "Tipo de bonificación no encontrado")
     labor = LaborRendimiento(**data.model_dump(), sede_id=sede_id)
     labor.recalcular_valores()
     db.add(labor)
@@ -430,6 +434,10 @@ def actualizar_labor(
     labor = db.query(LaborRendimiento).filter_by(id=id, sede_id=sede_id).first()
     if not labor:
         raise HTTPException(404, "Labor no encontrada")
+    if data.tipo_bonificacion_id and not db.query(TipoBonificacion).filter_by(
+        id=data.tipo_bonificacion_id, sede_id=sede_id
+    ).first():
+        raise HTTPException(400, "Tipo de bonificación no encontrado")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(labor, k, v)
     labor.recalcular_valores()

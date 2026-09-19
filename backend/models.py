@@ -117,6 +117,7 @@ class LaborRendimiento(Base):
     sede_id = Column(Integer, ForeignKey("sedes.id"), nullable=False, index=True)
     nombre = Column(Text, nullable=False)
     lider_id = Column(Integer, ForeignKey("lideres.id"), nullable=True)
+    tipo_bonificacion_id = Column(Integer, ForeignKey("tipos_bonificacion.id"), nullable=True)
     rendimiento_min_hora = Column(Float, nullable=False)
     tallos_por_ramo = Column(Integer, default=1)
     unidad_rendimiento = Column(Text, nullable=True)  # ej. "ramos", "unidades", "metros"
@@ -135,13 +136,20 @@ class LaborRendimiento(Base):
     valor_unidad_apoyo = Column(Float)
 
     lider_rel = relationship("Lider", back_populates="labores")
+    tipo_bonificacion_rel = relationship("TipoBonificacion")
 
     @property
     def lider_nombre(self) -> str | None:
         return self.lider_rel.nombre if self.lider_rel else None
 
+    @property
+    def tipo_bonificacion_nombre(self) -> str | None:
+        return self.tipo_bonificacion_rel.nombre if self.tipo_bonificacion_rel else None
+
     def recalcular_valores(self):
         horas_semana = 43.5
+        # pct_apoyo siempre es el complemento de pct_cortadores (replica L=1-K del Excel origen)
+        self.pct_apoyo = 1 - (self.pct_cortadores if self.pct_cortadores is not None else 0.86)
         if not self.rendimiento_min_hora:
             self.costo_estandar_tallo = 0.0
             self.costo_estandar_ramo = 0.0

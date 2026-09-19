@@ -70,13 +70,18 @@ def seed_database(db: Session):
 
     # ─── Tipos de bonificación (sede Manantiales) ───────────
     tipos_data = [
+        "RENDIMIENTO", "CALIDAD",
         "LABOR ESPECIFICA", "PERSONAL DE APOYO LABOR",
         "AUXILIO DE MANUTENCIÓN", "CONSTITUTIVA SALARIO",
         "PERSONAL DE APOYO CONTROL", "MEDIOS DE TRANSPORTE",
         "TIEMPO", "AJUSTE"
     ]
+    tipos = {}
     for nombre in tipos_data:
-        db.add(TipoBonificacion(nombre=nombre, sede_id=man.id))
+        tipo = TipoBonificacion(nombre=nombre, sede_id=man.id)
+        db.add(tipo)
+        db.flush()
+        tipos[nombre] = tipo.id
 
     # ─── Labores de rendimiento (sede Manantiales) ──────────
     labores_data = [
@@ -122,6 +127,7 @@ def seed_database(db: Session):
             tarifa_he_ordinaria=7736,
             tarifa_he_dominical=12378,
             semanas_mes_promedio=4.33,
+            tipo_bonificacion_id=tipos["RENDIMIENTO"],
             **labor_data
         )
         labor.recalcular_valores()

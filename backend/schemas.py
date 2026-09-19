@@ -119,7 +119,8 @@ class ConfigSemanasIn(BaseModel):
 class LaborRendimientoBase(BaseModel):
     nombre: str
     lider_id: Optional[int] = None
-    rendimiento_min_hora: float
+    tipo_bonificacion_id: Optional[int] = None
+    rendimiento_min_hora: float = 0
     tallos_por_ramo: int = 1
     unidad_rendimiento: Optional[str] = None
     salario_base: float = 1423500
@@ -137,6 +138,7 @@ class LaborRendimientoCreate(LaborRendimientoBase):
 class LaborRendimientoUpdate(BaseModel):
     nombre: Optional[str] = None
     lider_id: Optional[int] = None
+    tipo_bonificacion_id: Optional[int] = None
     rendimiento_min_hora: Optional[float] = None
     tallos_por_ramo: Optional[int] = None
     unidad_rendimiento: Optional[str] = None
@@ -152,6 +154,7 @@ class LaborRendimientoUpdate(BaseModel):
 class LaborRendimientoOut(LaborRendimientoBase):
     id: int
     lider_nombre: Optional[str] = None
+    tipo_bonificacion_nombre: Optional[str] = None
     costo_estandar_tallo: Optional[float] = None
     costo_estandar_ramo: Optional[float] = None
     valor_unidad_colaborador: Optional[float] = None

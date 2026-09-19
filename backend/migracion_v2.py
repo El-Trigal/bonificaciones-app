@@ -184,6 +184,38 @@ def migrar_ramos_a_unidades():
     agregar_columna_si_falta("labores_rendimiento", "unidad_rendimiento", "TEXT")
 
 
+def migrar_tipo_bonificacion_labores():
+    print("[+] Agregando 'tipo_bonificacion_id' a labores_rendimiento...")
+    agregar_columna_si_falta(
+        "labores_rendimiento", "tipo_bonificacion_id",
+        "INTEGER REFERENCES tipos_bonificacion(id)"
+    )
+
+
+def backfill_tipo_bonificacion(db):
+    """Toda labor sin tipo asignado queda como RENDIMIENTO (lo que ya era implícitamente).
+    También garantiza que exista el tipo CALIDAD por sede, para poder catalogar la labor
+    de aseguramiento de calidad como una labor más (bono fijo, no ligado al % de calidad)."""
+    print("[+] Asignando tipo_bonificacion a labores existentes sin tipo...")
+    sedes_ids = {row[0] for row in db.query(models.LaborRendimiento.sede_id).distinct().all()}
+    for sede_id in sedes_ids:
+        tipo_rend = db.query(models.TipoBonificacion).filter_by(sede_id=sede_id, nombre="RENDIMIENTO").first()
+        if not tipo_rend:
+            tipo_rend = models.TipoBonificacion(sede_id=sede_id, nombre="RENDIMIENTO")
+            db.add(tipo_rend)
+            db.flush()
+        if not db.query(models.TipoBonificacion).filter_by(sede_id=sede_id, nombre="CALIDAD").first():
+            db.add(models.TipoBonificacion(sede_id=sede_id, nombre="CALIDAD"))
+
+        actualizadas = db.query(models.LaborRendimiento).filter(
+            models.LaborRendimiento.sede_id == sede_id,
+            models.LaborRendimiento.tipo_bonificacion_id.is_(None),
+        ).update({"tipo_bonificacion_id": tipo_rend.id})
+        if actualizadas:
+            print(f"      [+] {actualizadas} labor(es) de sede {sede_id} asignadas a RENDIMIENTO")
+    db.commit()
+
+
 def main():
     print("=" * 60)
     print("MIGRACION V2 - Sistema de Bonificaciones")
@@ -194,11 +226,13 @@ def main():
         migrar_semanas()
         migrar_usuarios_seguridad()
         migrar_ramos_a_unidades()
+        migrar_tipo_bonificacion_labores()
         db = SessionLocal()
         try:
             sembrar_periodos_2026(db)
             vincular_semanas_a_periodos(db)
             crear_admin_inicial(db)
+            backfill_tipo_bonificacion(db)
         finally:
             db.close()
         print("=" * 60)

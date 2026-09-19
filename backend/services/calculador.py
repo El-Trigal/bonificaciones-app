@@ -389,8 +389,14 @@ def generar_narrativo_labor_especifica(r: dict) -> dict:
 def calcular_bonif_apoyo(semana: str, labor: str, db: Session) -> list:
     """
     Calcula bonificación de personal de apoyo para una semana+labor.
-    Suma las unidades adicionales de todo el grupo de rendimiento y distribuye.
-    Retorna lista de resultados (uno por persona de apoyo).
+    Replica la hoja Excel (columnas CO/CP/CG): la diferencia unidades_ejecutadas -
+    unidades_requeridas de CADA colaborador del grupo de rendimiento se suma CON SIGNO
+    (superávit de quien superó el mínimo, déficit -negativo- de quien no llegó), no solo
+    los superávits. El pool resultante puede ser 0 o negativo si el grupo, en conjunto,
+    no alcanzó el mínimo — en ese caso el personal de apoyo queda en $0 (nunca se le paga
+    de más por el hecho de que el grupo haya quedado corto).
+    Retorna lista de resultados (uno por persona de apoyo, siempre — incluso en $0 — para
+    trazabilidad).
     """
     # Buscar la configuración de la labor
     labor_config = db.query(LaborRendimiento).filter(
@@ -407,17 +413,18 @@ def calcular_bonif_apoyo(semana: str, labor: str, db: Session) -> list:
         Liquidacion.tipo_bonificacion == "RENDIMIENTO"
     ).all()
 
-    # Sumar unidades adicionales del grupo
-    total_unidades_adicionales_grupo = sum(
-        l.unidades_adicionales or 0 for l in liquidaciones_rend
+    # Diferencia neta del grupo (equivalente a SUMA(CO:CP) del Excel): se suma la
+    # diferencia real ejecutadas-requeridas de cada colaborador, sin recortarla a 0.
+    diferencia_neta_grupo = sum(
+        (l.unidades_ejecutadas or 0) - (l.unidades_requeridas or 0)
+        for l in liquidaciones_rend
     )
 
-    if total_unidades_adicionales_grupo <= 0:
-        return []
-
-    # Calcular bonificación total de apoyo
+    # Calcular bonificación total de apoyo. La diferencia puede ser negativa (el grupo
+    # quedó corto en conjunto), pero el pool nunca paga menos que $0 — solo se limita
+    # cuánto "sobra" para repartir, nunca se cobra de vuelta al personal de apoyo.
     valor_apoyo = labor_config.valor_unidad_apoyo or 0
-    bonif_total_apoyo = total_unidades_adicionales_grupo * valor_apoyo
+    bonif_total_apoyo = max(0, diferencia_neta_grupo * valor_apoyo)
 
     # Buscar registros de personal de apoyo para esta semana+labor
     registros_apoyo = db.query(RegistroLaborEspecifica).filter(
@@ -452,7 +459,7 @@ def calcular_bonif_apoyo(semana: str, labor: str, db: Session) -> list:
             "observaciones": reg.observaciones,
             "detalle_apoyo": {
                 "colaboradores_rendimiento": len(liquidaciones_rend),
-                "total_unidades_adicionales_grupo": total_unidades_adicionales_grupo,
+                "diferencia_neta_grupo": diferencia_neta_grupo,
                 "valor_unidad_apoyo": valor_apoyo,
                 "bonif_total_apoyo": bonif_total_apoyo,
                 "cantidad_personal_apoyo": cantidad_apoyo,
@@ -462,6 +469,52 @@ def calcular_bonif_apoyo(semana: str, labor: str, db: Session) -> list:
         resultados.append(resultado)
 
     return resultados
+
+
+def generar_narrativo_apoyo(r: dict) -> dict:
+    """Genera JSON narrativo para bonificación de personal de apoyo."""
+    d = r["detalle_apoyo"]
+    return {
+        "version": "1.0",
+        "tipo_calculo": "APOYO",
+        "labor": r["labor"],
+        "semana": r["semana"],
+        "colaborador": r["nombre_colaborador"],
+        "pasos": [
+            {
+                "paso": 1, "nombre": "Diferencia neta del grupo de rendimiento",
+                "detalle": {
+                    "colaboradores_rendimiento": d["colaboradores_rendimiento"],
+                    "diferencia_neta_grupo": d["diferencia_neta_grupo"],
+                    "formula": "Σ(unidades_ejecutadas - unidades_requeridas) de cada colaborador del grupo, "
+                               "sumando superávits y déficits (sin recortar a 0)",
+                }
+            },
+            {
+                "paso": 2, "nombre": "Pool total de apoyo",
+                "detalle": {
+                    "valor_unidad_apoyo": d["valor_unidad_apoyo"],
+                    "bonif_total_apoyo": d["bonif_total_apoyo"],
+                    "formula": f"{d['diferencia_neta_grupo']:,.2f} × ${d['valor_unidad_apoyo']:,.2f} = ${d['bonif_total_apoyo']:,.0f}",
+                }
+            },
+            {
+                "paso": 3, "nombre": "Reparto entre personal de apoyo",
+                "detalle": {
+                    "cantidad_personal_apoyo": d["cantidad_personal_apoyo"],
+                    "bonif_individual_base": d["bonif_individual_base"],
+                    "pct_calificacion": r["pct_calificacion_colaborador"],
+                    "formula": f"round(${d['bonif_individual_base']:,.0f} × {r['pct_calificacion_colaborador']}, centena) = ${r['total_bonificacion']:,.0f}",
+                    "bonif_final": r["total_bonificacion"],
+                }
+            },
+        ],
+        "advertencias": (
+            ["El grupo de rendimiento no alcanzó el mínimo en conjunto: el pool de apoyo quedó en 0 o negativo."]
+            if d["bonif_total_apoyo"] <= 0 else []
+        ),
+        "resultado_final": r["total_bonificacion"],
+    }
 
 
 def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
@@ -477,7 +530,7 @@ def guardar_liquidacion_y_pasos(resultado: dict, db: Session,
         narrativo = generar_narrativo_rendimiento(resultado)
     elif tipo_calculo == "APOYO":
         tipo_bonif = "PERSONAL DE APOYO LABOR"
-        narrativo = generar_narrativo_labor_especifica(resultado)
+        narrativo = generar_narrativo_apoyo(resultado)
     elif tipo_calculo == "AUXILIO":
         tipo_bonif = "AUXILIO DE MANUTENCIÓN"
         narrativo = generar_narrativo_labor_especifica(resultado)
@@ -614,6 +667,13 @@ def calcular_liquidacion_completa(semana: str, carga_id: int, tipo: str, db: Ses
                 if not labor:
                     resultados["errores"].append(
                         f"Labor '{reg.labor}' no encontrada para {reg.nombre_colaborador}"
+                    )
+                    continue
+
+                if labor.tipo_bonificacion_id is not None and labor.tipo_bonificacion_nombre != "RENDIMIENTO":
+                    resultados["errores"].append(
+                        f"Labor '{reg.labor}' no es de tipo RENDIMIENTO, no se puede liquidar "
+                        f"por este flujo ({reg.nombre_colaborador})"
                     )
                     continue
 

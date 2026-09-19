@@ -90,8 +90,13 @@ def ejecutar_calculo_semana(db: Session, semana: str, usuario: str, sede_id: int
     for r in registros:
         grupos.setdefault((r.codigo_colaborador, r.labor), []).append(r)
 
+    # Solo labores de tipo RENDIMIENTO pasan por este motor — una labor de CALIDAD (u
+    # otro tipo fijo) nunca debe liquidarse como si tuviera rendimiento/unidades exigidas,
+    # aunque comparta el mismo catálogo de labores.
     labores_cache: dict[str, LaborRendimiento] = {}
     for lab in db.query(LaborRendimiento).filter_by(sede_id=sede_id).all():
+        if lab.tipo_bonificacion_id is not None and lab.tipo_bonificacion_nombre != "RENDIMIENTO":
+            continue
         labores_cache[lab.nombre] = lab
 
     procesados = 0

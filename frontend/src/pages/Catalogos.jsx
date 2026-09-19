@@ -169,6 +169,7 @@ function TabEmpleados() {
 function TabLabores() {
   const [labores, setLabores] = useState([]);
   const [lideres, setLideres] = useState([]);
+  const [tiposBonificacion, setTiposBonificacion] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
@@ -257,6 +258,7 @@ function TabLabores() {
     cargar();
     cargarConfigNomina();
     api.get('/catalogos/lideres').then(({ data }) => setLideres(data)).catch(() => setLideres([]));
+    api.get('/catalogos/tipos-bonificacion').then(({ data }) => setTiposBonificacion(data)).catch(() => setTiposBonificacion([]));
   }, []);
 
   async function recomputarLideres() {
@@ -279,7 +281,7 @@ function TabLabores() {
     const tpr = parseInt(f.tallos_por_ramo) || 1;
     const pct = parseFloat(f.pct_a_pagar_colaboradores) || 0.6;
     const pctC = parseFloat(f.pct_cortadores) || 0.86;
-    const pctA = parseFloat(f.pct_apoyo) || 0.14;
+    const pctA = 1 - pctC; // siempre complemento de pct_cortadores, igual que el backend
     const cet = sb / (smp * 43.5 * rmh);
     const cer = cet * tpr;
     const vuc = cer * pct * pctC;
@@ -298,7 +300,7 @@ function TabLabores() {
         semanas_mes_promedio: parseFloat(form.semanas_mes_promedio),
         pct_a_pagar_colaboradores: parseFloat(form.pct_a_pagar_colaboradores),
         pct_cortadores: parseFloat(form.pct_cortadores),
-        pct_apoyo: parseFloat(form.pct_apoyo),
+        pct_apoyo: 1 - parseFloat(form.pct_cortadores),
       };
       if (modal === 'crear') {
         await api.post('/catalogos/labores-rendimiento', payload);
@@ -484,6 +486,17 @@ function TabLabores() {
             </select>
           </div>
           <div>
+            <label className="block text-sm font-medium mb-1">Tipo de bonificación</label>
+            <select value={form.tipo_bonificacion_id ?? ''} onChange={e => setForm({...form, tipo_bonificacion_id: e.target.value ? parseInt(e.target.value) : null})}
+              className="w-full border rounded-lg px-3 py-2 bg-white">
+              <option value="">— Sin definir (RENDIMIENTO por defecto) —</option>
+              {tiposBonificacion.filter(t => t.activo).map(t => (
+                <option key={t.id} value={t.id}>{t.nombre}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Si no es RENDIMIENTO, es un bono fijo (ej. CALIDAD) — no aplica rendimiento/unidades</p>
+          </div>
+          <div>
             <label className="block text-sm font-medium mb-1">Unidad de rendimiento</label>
             <input type="text" value={form.unidad_rendimiento ?? ''} onChange={e => setForm({...form, unidad_rendimiento: e.target.value})}
               placeholder="ej. ramos, unidades, metros..."
@@ -499,7 +512,6 @@ function TabLabores() {
             ['semanas_mes_promedio', 'Semanas/mes promedio', 'Generalmente 4.33'],
             ['pct_a_pagar_colaboradores', '% a pagar colaboradores', '0.60 = 60%, 0.90 para siembras'],
             ['pct_cortadores', '% cortadores', '0.86 = 86% va a cortadores directos'],
-            ['pct_apoyo', '% apoyo', '0.14 = 14% va a personal de apoyo'],
           ].map(([key, label, hint]) => (
             <div key={key}>
               <label className="block text-sm font-medium mb-1">{label}</label>
@@ -508,6 +520,13 @@ function TabLabores() {
               <p className="text-xs text-gray-400 mt-1">{hint}</p>
             </div>
           ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">% apoyo (calculado)</label>
+            <input type="number" step="any" disabled
+              value={(1 - (parseFloat(form.pct_cortadores) || 0)).toFixed(4)}
+              className="w-full border rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+            <p className="text-xs text-gray-400 mt-1">Siempre es 1 − % cortadores</p>
+          </div>
         </div>
 
         {derivados && (
