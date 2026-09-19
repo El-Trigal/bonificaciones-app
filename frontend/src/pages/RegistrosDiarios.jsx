@@ -622,26 +622,37 @@ export default function RegistrosDiarios() {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                 Producción
               </p>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Unidades
-                  {laborSel?.unidad_rendimiento && (
-                    <span className="ml-1 text-gray-400">({laborSel.unidad_rendimiento})</span>
-                  )}
-                  {laborSel?.tallos_por_ramo > 1 && (
-                    <span className="ml-1 text-gray-400">
-                      (×{laborSel.tallos_por_ramo} → {parseFloat(nuevo.unidades) || 0} unid)
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="number" step="any" inputMode="decimal" min="0"
-                  value={nuevo.tallos}
-                  onChange={e => handleTallosChange(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
-                             focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                />
+              <div className={laborSel?.tallos_por_ramo > 1 ? 'grid grid-cols-2 gap-3' : ''}>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Unidades
+                    {laborSel?.unidad_rendimiento && (
+                      <span className="ml-1 text-gray-400">({laborSel.unidad_rendimiento})</span>
+                    )}
+                  </label>
+                  <input
+                    type="number" step="any" inputMode="decimal" min="0"
+                    value={nuevo.tallos}
+                    onChange={e => handleTallosChange(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                               focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
+                {laborSel?.tallos_por_ramo > 1 && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Unidades de rendimiento (×{laborSel.tallos_por_ramo})
+                    </label>
+                    <input
+                      type="text" disabled
+                      value={parseFloat(nuevo.unidades) || 0}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm
+                                 bg-gray-50 text-gray-800 font-semibold cursor-not-allowed"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Este es el valor que se compara contra el rendimiento mínimo/hora</p>
+                  </div>
+                )}
               </div>
             </section>
 
